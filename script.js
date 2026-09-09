@@ -1939,7 +1939,7 @@ async function gerarImagemRelatorio(){
 
         canvas = await html2canvas(elemento, {
 
-            backgroundColor: "#14181C",
+            backgroundColor: "#EEF1F8",
 
             scale: 2
 
@@ -2052,7 +2052,7 @@ async function gerarImagemRelatorioFiltrado(){
 
         canvas = await html2canvas(elemento, {
 
-            backgroundColor: "#14181C",
+            backgroundColor: "#EEF1F8",
 
             scale: 2
 

@@ -1,29 +1,35 @@
 /* =========================================================
-   GERADOR DE ABASTECIMENTO PCP — PAINEL INDUSTRIAL
-   Tokens: grafite + âmbar (ação) / verde (ok) / vermelho (crítico) / azul (neutro)
+   COMPARATIVO DE ESTOQUE CD x COMERCIAL — CONSOLE DE LOGÍSTICA
+   Comercial Zaffari / Stok Center
+   Paleta alinhada ao Gerador de Abastecimento PCP: console navy
+   sobre mesa de trabalho clara, com grid de piso de armazém ao
+   fundo e leitura de dados em monoespaçada.
    Tipografia: Oswald (display) + Inter (corpo) + JetBrains Mono (dados)
 ========================================================= */
 
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root{
-    --bg:            #14181C;
-    --surface:       #1D2329;
-    --surface-alt:   #232A31;
-    --border:        #2A323B;
-    --border-light:  #38424D;
+    --navy-deep:     #0E1B3D;
+    --navy-mid:      #16265A;
 
-    --text:          #E7ECF1;
-    --text-muted:    #8B97A3;
+    --bg:            #EEF1F8;
+    --surface:       #FFFFFF;
+    --surface-alt:   #F2F4FA;
+    --border:        #DEE3F0;
+    --border-light:  #C7CFE6;
 
-    --amber:         #F2A93B;
-    --amber-dim:     #6B5525;
-    --green:         #3DCB82;
-    --green-dim:     #1F4B36;
-    --red:           #E8564F;
-    --red-dim:       #4E2523;
-    --blue:          #4C8FD1;
-    --blue-dim:      #223A52;
+    --text:          #16203E;
+    --text-muted:    #6B7593;
+
+    --amber:         #E48B00;
+    --amber-dim:     #FCEFDD;
+    --green:         #1E9E5C;
+    --green-dim:     #E3F7EC;
+    --red:           #D9333F;
+    --red-dim:       #FBE6E8;
+    --blue:          #2E63A8;
+    --blue-dim:      #E4ECF9;
 
     --radius:        6px;
     --radius-sm:     4px;
@@ -42,15 +48,100 @@
 
 body{
     background:
-        radial-gradient(ellipse at top, #1A2027 0%, var(--bg) 55%);
-    background-attachment:fixed;
-    padding:25px;
+        radial-gradient(circle, rgba(14,27,61,.12) 1.5px, transparent 1.5px)
+        0 0 / 24px 24px,
+        var(--bg);
     color:var(--text);
+}
+
+/* =========================
+CONSOLE — BARRA SUPERIOR
+(assinatura visual: painel de despacho)
+========================= */
+
+.topbar{
+    position:sticky;
+    top:0;
+    z-index:500;
+    background:linear-gradient(180deg, var(--navy-mid) 0%, var(--navy-deep) 100%);
+    border-bottom:3px solid var(--amber);
+    box-shadow:0 8px 24px rgba(14,27,61,.25);
+}
+
+.topbar-inner{
+    max-width:1700px;
+    margin:auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:18px;
+    flex-wrap:wrap;
+    padding:16px 25px;
+}
+
+.topbar-marca{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+}
+
+.topbar-marca .icone{
+    font-size:1.4rem;
+}
+
+.topbar-marca h1{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:1.3rem;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    color:#FFFFFF;
+}
+
+.topbar-marca span{
+    display:block;
+    margin-top:2px;
+    font-family:var(--font-mono);
+    font-size:.68rem;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:#A9B4D6;
+}
+
+.topbar-tag{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:var(--font-mono);
+    font-size:.72rem;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    color:#C7CFE6;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:20px;
+    padding:6px 14px;
+}
+
+.topbar-tag .ponto{
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:var(--amber);
+    box-shadow:0 0 0 0 rgba(228,139,0,.6);
+    animation:pulsarPonto 2s infinite;
+}
+
+@keyframes pulsarPonto{
+    0%{ box-shadow:0 0 0 0 rgba(228,139,0,.55); }
+    70%{ box-shadow:0 0 0 7px rgba(228,139,0,0); }
+    100%{ box-shadow:0 0 0 0 rgba(228,139,0,0); }
 }
 
 .container{
     max-width:1700px;
     margin:auto;
+    padding:28px 25px 25px;
 }
 
 /* =========================
@@ -97,7 +188,7 @@ CARDS
     border-radius:var(--radius);
     padding:25px;
     box-shadow:
-        0 10px 30px rgba(0,0,0,.35);
+        0 6px 22px rgba(24,37,82,.08);
     margin-bottom:25px;
 }
 
@@ -628,12 +719,12 @@ td{
 
 tbody tr:nth-child(even){
 
-    background:rgba(255,255,255,.02);
+    background:rgba(24,37,82,.02);
 }
 
 tbody tr:hover{
 
-    background:rgba(76,143,209,.1);
+    background:rgba(46,99,168,.08);
 }
 
 /* =========================
@@ -1354,7 +1445,7 @@ grid-template-columns:repeat(2,1fr);
 
     flex-wrap:wrap;
 
-    margin:-10px auto 25px;
+    margin:0 auto 25px;
 
 }
 
