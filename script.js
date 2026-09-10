@@ -1233,6 +1233,25 @@ function renderizarCards(dados = resultado){
 // FILTROS
 // =====================================
 
+// extrai o número da rua (CODRUA) a partir de um
+// endereço no formato "RUA.PREDIO.APTO.SALA"
+
+function extrairRua(endereco){
+
+    if(!endereco){
+
+        return null;
+
+    }
+
+    const rua = String(endereco).split(".")[0];
+
+    const numero = Number(rua);
+
+    return isNaN(numero) ? rua : numero;
+
+}
+
 function obterFiltrado(){
 
     const skuFiltro =
@@ -1262,6 +1281,17 @@ function obterFiltrado(){
     document
     .getElementById("ordenarPor")
     ?.value || "sku";
+
+    const ruaFiltroRaw =
+    document
+    .getElementById("filtroRua")
+    ?.value
+    .trim() || "";
+
+    const ruaFiltro =
+    ruaFiltroRaw === ""
+    ? null
+    : (isNaN(Number(ruaFiltroRaw)) ? ruaFiltroRaw.toLowerCase() : Number(ruaFiltroRaw));
 
     const pavilhoesFiltro =
     obterPavilhoesFiltroAtual();
@@ -1312,7 +1342,20 @@ function obterFiltrado(){
 
             pavilhoesFiltro.includes(item.pavilhao);
 
-        return skuOk && qtdOk && valorOk && pavilhaoOk;
+        // rua: bate se a rua da apanha OU a rua de
+        // qualquer pulmão do item corresponder ao filtro
+
+        const ruaOk =
+
+            ruaFiltro === null ||
+
+            extrairRua(item.enderecoApanha) === ruaFiltro ||
+
+            item.pulmoes.some(p=>
+                extrairRua(p.endereco) === ruaFiltro
+            );
+
+        return skuOk && qtdOk && valorOk && pavilhaoOk && ruaOk;
 
     });
 
@@ -1375,6 +1418,13 @@ window.addEventListener("load",()=>{
 
     document
     .getElementById("filtroQtdPulmoes")
+    ?.addEventListener(
+        "input",
+        aplicarFiltros
+    );
+
+    document
+    .getElementById("filtroRua")
     ?.addEventListener(
         "input",
         aplicarFiltros
@@ -1749,6 +1799,18 @@ function obterResumoFiltrosAtivos(){
     if(qtdFiltro){
 
         partes.push(`Nº de pulmões: ${qtdFiltro}`);
+
+    }
+
+    const ruaFiltro =
+    document
+    .getElementById("filtroRua")
+    ?.value
+    .trim();
+
+    if(ruaFiltro){
+
+        partes.push(`Rua: "${ruaFiltro}"`);
 
     }
 
