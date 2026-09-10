@@ -1048,6 +1048,18 @@ function atualizarKPIs(){
         valorPerda
     );
 
+    // valor absoluto: soma do ganho com a perda,
+    // representa o impacto financeiro total das
+    // divergências, sem compensar um lado com o outro
+
+    const valorAbsoluto =
+    valorGanho + valorPerda;
+
+    setTextoMoeda(
+        "kpiValorAbsoluto",
+        valorAbsoluto
+    );
+
 }
 
 // =====================================
@@ -1823,6 +1835,18 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
         {style:"currency",currency:"BRL"}
     );
 
+    // impacto total: ganho + perda somados, sem
+    // compensar um lado com o outro
+
+    const valorAbsoluto =
+    valorGanho + valorPerda;
+
+    const valorAbsolutoFormatado =
+    valorAbsoluto.toLocaleString(
+        "pt-BR",
+        {style:"currency",currency:"BRL"}
+    );
+
     function linha(label, valor, classeExtra){
 
         return `
@@ -1899,6 +1923,7 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
 
         ${linha("Valor Ganho (divergência positiva)", valorGanhoFormatado, "ri-dist-valor--ganho")}
         ${linha("Valor Perda (divergência negativa)", valorPerdaFormatado, "ri-dist-valor--perda")}
+        ${linha("Impacto Total (ganho + perda)", valorAbsolutoFormatado)}
 
     </div>
 

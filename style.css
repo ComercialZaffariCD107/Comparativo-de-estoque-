@@ -458,6 +458,9 @@ Cor da borda lateral = significado real do dado
 .kpi-card.kpi-perda{ border-left-color:var(--red); }
 .kpi-card.kpi-perda span{ color:var(--red); }
 
+.kpi-card.kpi-absoluto{ border-left-color:var(--blue); }
+.kpi-card.kpi-absoluto span{ color:var(--blue); }
+
 /* =========================
 FILTROS
 ========================= */
