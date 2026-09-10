@@ -596,11 +596,7 @@ FILTRO PAVILHÃO — MULTI-SELEÇÃO
 
     right:auto;
 
-    width:max-content;
-
-    min-width:100%;
-
-    max-width:min(90vw,280px);
+    width:min(250px,calc(100vw - 40px));
 
     z-index:20;
 
