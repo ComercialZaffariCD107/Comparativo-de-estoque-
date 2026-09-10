@@ -256,6 +256,7 @@ function obterPavilhoesFiltroAtual(){
 }
 
 popularFiltroPavilhao();
+popularFiltroRua();
 
 // =====================================
 // INICIALIZAÇÃO — NOME DOS ARQUIVOS
@@ -1259,9 +1260,15 @@ function extrairRua(endereco){
 
 }
 
-// monta o <select> de ruas com base nas ruas que
-// realmente aparecem no comparativo atual (apanha
-// e pulmões), em ordem numérica crescente
+// monta o <select> de ruas com base nas ruas
+// oficialmente cadastradas em cada pavilhão
+// (mesma referência oficial de Pavilhão_1.txt,
+// Pavilhão_2.txt, Pavilhão_3.txt e Perecível.txt —
+// os intervalos abaixo batem exatamente com as ruas
+// que aparecem nesses arquivos), agrupadas por
+// pavilhão no dropdown. Como é uma lista fixa,
+// as ruas aparecem sempre, mesmo antes de
+// processar qualquer comparativo.
 
 function popularFiltroRua(){
 
@@ -1272,65 +1279,41 @@ function popularFiltroRua(){
 
     const valorAtual = select.value;
 
-    const ruas = new Set();
+    let html = `<option value="">Todas as Ruas</option>`;
 
-    resultado.forEach(item=>{
+    PAVILHOES.forEach(pav=>{
 
-        const ruaApanha =
-        extrairRua(item.enderecoApanha);
+        const ruasDoPavilhao = [];
 
-        if(ruaApanha !== null){
+        pav.ruas.forEach(([ruaInicio, ruaFim])=>{
 
-            ruas.add(ruaApanha);
+            for(let r = ruaInicio; r <= ruaFim; r++){
 
-        }
-
-        item.pulmoes.forEach(p=>{
-
-            const ruaPulmao =
-            extrairRua(p.endereco);
-
-            if(ruaPulmao !== null){
-
-                ruas.add(ruaPulmao);
+                ruasDoPavilhao.push(r);
 
             }
 
         });
 
-    });
+        html += `<optgroup label="${pav.nome}">`;
 
-    const ruasOrdenadas =
-    Array.from(ruas).sort((a,b)=>{
+        ruasDoPavilhao.forEach(rua=>{
 
-        const numA = Number(a);
-        const numB = Number(b);
+            const valor =
+            String(rua).padStart(3,"0");
 
-        if(!isNaN(numA) && !isNaN(numB)){
+            html += `<option value="${valor}">Rua ${valor}</option>`;
 
-            return numA - numB;
+        });
 
-        }
-
-        return String(a).localeCompare(String(b));
-
-    });
-
-    let html = `<option value="">Todas as Ruas</option>`;
-
-    ruasOrdenadas.forEach(rua=>{
-
-        const valor =
-        String(rua).padStart(3,"0");
-
-        html += `<option value="${valor}">Rua ${valor}</option>`;
+        html += `</optgroup>`;
 
     });
 
     select.innerHTML = html;
 
     // mantém a rua selecionada, se ainda existir
-    // na lista após reprocessar os dados
+    // na lista após repopular
 
     if(valorAtual && Array.from(select.options)
         .some(o=>o.value === valorAtual)){
