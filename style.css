@@ -594,7 +594,13 @@ FILTRO PAVILHÃO — MULTI-SELEÇÃO
 
     left:0;
 
-    right:0;
+    right:auto;
+
+    width:max-content;
+
+    min-width:100%;
+
+    max-width:min(90vw,280px);
 
     z-index:20;
 
@@ -669,8 +675,6 @@ FILTRO PAVILHÃO — MULTI-SELEÇÃO
     overflow-y:auto;
 
     overflow-x:hidden;
-
-    min-width:200px;
 }
 
 .filtro-rua-grupo-titulo{
