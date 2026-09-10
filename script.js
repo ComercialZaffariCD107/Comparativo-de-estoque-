@@ -833,6 +833,13 @@ function gerarComparativo(){
     }
 
     try{
+        popularFiltroRua();
+    }
+    catch(erro){
+        console.error("Falha em popularFiltroRua():", erro);
+    }
+
+    try{
         renderizarCards();
     }
     catch(erro){
@@ -1252,6 +1259,88 @@ function extrairRua(endereco){
 
 }
 
+// monta o <select> de ruas com base nas ruas que
+// realmente aparecem no comparativo atual (apanha
+// e pulmões), em ordem numérica crescente
+
+function popularFiltroRua(){
+
+    const select =
+    document.getElementById("filtroRua");
+
+    if(!select) return;
+
+    const valorAtual = select.value;
+
+    const ruas = new Set();
+
+    resultado.forEach(item=>{
+
+        const ruaApanha =
+        extrairRua(item.enderecoApanha);
+
+        if(ruaApanha !== null){
+
+            ruas.add(ruaApanha);
+
+        }
+
+        item.pulmoes.forEach(p=>{
+
+            const ruaPulmao =
+            extrairRua(p.endereco);
+
+            if(ruaPulmao !== null){
+
+                ruas.add(ruaPulmao);
+
+            }
+
+        });
+
+    });
+
+    const ruasOrdenadas =
+    Array.from(ruas).sort((a,b)=>{
+
+        const numA = Number(a);
+        const numB = Number(b);
+
+        if(!isNaN(numA) && !isNaN(numB)){
+
+            return numA - numB;
+
+        }
+
+        return String(a).localeCompare(String(b));
+
+    });
+
+    let html = `<option value="">Todas as Ruas</option>`;
+
+    ruasOrdenadas.forEach(rua=>{
+
+        const valor =
+        String(rua).padStart(3,"0");
+
+        html += `<option value="${valor}">Rua ${valor}</option>`;
+
+    });
+
+    select.innerHTML = html;
+
+    // mantém a rua selecionada, se ainda existir
+    // na lista após reprocessar os dados
+
+    if(valorAtual && Array.from(select.options)
+        .some(o=>o.value === valorAtual)){
+
+        select.value = valorAtual;
+
+    }
+
+}
+
 function obterFiltrado(){
 
     const skuFiltro =
@@ -1291,7 +1380,7 @@ function obterFiltrado(){
     const ruaFiltro =
     ruaFiltroRaw === ""
     ? null
-    : (isNaN(Number(ruaFiltroRaw)) ? ruaFiltroRaw.toLowerCase() : Number(ruaFiltroRaw));
+    : Number(ruaFiltroRaw);
 
     const pavilhoesFiltro =
     obterPavilhoesFiltroAtual();
@@ -1426,7 +1515,7 @@ window.addEventListener("load",()=>{
     document
     .getElementById("filtroRua")
     ?.addEventListener(
-        "input",
+        "change",
         aplicarFiltros
     );
 
@@ -1810,7 +1899,7 @@ function obterResumoFiltrosAtivos(){
 
     if(ruaFiltro){
 
-        partes.push(`Rua: "${ruaFiltro}"`);
+        partes.push(`Rua: ${ruaFiltro}`);
 
     }
 

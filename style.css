@@ -501,15 +501,6 @@ FILTROS
     color:var(--text-muted);
 }
 
-#filtroRua{
-
-    min-width:160px;
-
-    max-width:200px;
-
-    flex:0 1 200px;
-}
-
 .filtros input:focus,
 .filtros select:focus{
 
