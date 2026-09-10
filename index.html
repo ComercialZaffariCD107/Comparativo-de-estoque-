@@ -376,11 +376,26 @@
                     min="0"
                     placeholder="Nº exato de pulmões (ex: 2)">
 
-                <select id="filtroRua">
+                <div class="filtro-pavilhao-multi" id="filtroRuaMulti">
 
-                    <option value="">Todas as Ruas</option>
+                    <button
+                        type="button"
+                        class="filtro-pavilhao-btn"
+                        id="filtroRuaBtn"
+                        onclick="toggleRuaDropdown()">
 
-                </select>
+                        <span id="filtroRuaLabel">Todas as Ruas</span>
+                        <span class="filtro-pavilhao-seta">▾</span>
+
+                    </button>
+
+                    <div
+                        class="filtro-pavilhao-opcoes filtro-rua-opcoes"
+                        id="filtroRuaOpcoes"
+                        style="display:none;">
+                    </div>
+
+                </div>
 
                 <select id="filtroTipoValor">
 

@@ -133,11 +133,21 @@ document.addEventListener("click", function(e){
     const opcoes =
     document.getElementById("filtroPavilhaoOpcoes");
 
-    if(!container || !opcoes) return;
-
-    if(!container.contains(e.target)){
+    if(container && opcoes && !container.contains(e.target)){
 
         opcoes.style.display = "none";
+
+    }
+
+    const containerRua =
+    document.getElementById("filtroRuaMulti");
+
+    const opcoesRua =
+    document.getElementById("filtroRuaOpcoes");
+
+    if(containerRua && opcoesRua && !containerRua.contains(e.target)){
+
+        opcoesRua.style.display = "none";
 
     }
 
@@ -252,6 +262,144 @@ function obterPavilhoesFiltroAtual(){
     }
 
     return marcados.map(chk => chk.value);
+
+}
+
+// =====================================
+// FILTRO DE RUA (mesmo padrão do
+// filtro de pavilhão, com checkboxes
+// agrupados por pavilhão)
+// =====================================
+
+function toggleRuaDropdown(){
+
+    const opcoes =
+    document.getElementById("filtroRuaOpcoes");
+
+    if(!opcoes) return;
+
+    opcoes.style.display =
+    opcoes.style.display === "none"
+    ? "block"
+    : "none";
+
+}
+
+function alternarTodasRuas(chkTodos){
+
+    document
+    .querySelectorAll(".filtroRuaItem")
+    .forEach(chk=>{
+
+        chk.checked = chkTodos.checked;
+
+    });
+
+    atualizarLabelRua();
+
+    if(typeof aplicarFiltros === "function"){
+
+        aplicarFiltros();
+
+    }
+
+}
+
+function atualizarSelecaoRuas(){
+
+    const itens =
+    document.querySelectorAll(".filtroRuaItem");
+
+    const chkTodos =
+    document.getElementById("filtroRuaTodos");
+
+    const todosMarcados =
+    Array.from(itens)
+    .every(chk => chk.checked);
+
+    if(chkTodos){
+
+        chkTodos.checked = todosMarcados;
+
+    }
+
+    atualizarLabelRua();
+
+    if(typeof aplicarFiltros === "function"){
+
+        aplicarFiltros();
+
+    }
+
+}
+
+function atualizarLabelRua(){
+
+    const label =
+    document.getElementById("filtroRuaLabel");
+
+    if(!label) return;
+
+    const itens =
+    Array.from(
+        document.querySelectorAll(".filtroRuaItem")
+    );
+
+    const marcados =
+    itens.filter(chk => chk.checked);
+
+    if(marcados.length === 0){
+
+        label.innerText = "Nenhuma Rua";
+
+    }
+    else if(marcados.length === itens.length){
+
+        label.innerText = "Todas as Ruas";
+
+    }
+    else if(marcados.length <= 3){
+
+        label.innerText =
+        marcados
+        .map(chk => `Rua ${chk.value}`)
+        .join(", ");
+
+    }
+    else{
+
+        label.innerText =
+        `${marcados.length} ruas selecionadas`;
+
+    }
+
+}
+
+// Array vazio = todas marcadas = sem filtro (mesmo
+// comportamento do filtro de pavilhão).
+function obterRuasFiltroAtual(){
+
+    const itens =
+    Array.from(
+        document.querySelectorAll(".filtroRuaItem")
+    );
+
+    if(!itens.length){
+
+        return [];
+
+    }
+
+    const marcados =
+    itens.filter(chk => chk.checked);
+
+    if(marcados.length === itens.length){
+
+        return [];
+
+    }
+
+    return marcados.map(chk => Number(chk.value));
 
 }
 
@@ -1260,26 +1408,49 @@ function extrairRua(endereco){
 
 }
 
-// monta o <select> de ruas com base nas ruas
-// oficialmente cadastradas em cada pavilhão
+// monta o dropdown de ruas (checkboxes) com base
+// nas ruas oficialmente cadastradas em cada pavilhão
 // (mesma referência oficial de Pavilhão_1.txt,
 // Pavilhão_2.txt, Pavilhão_3.txt e Perecível.txt —
 // os intervalos abaixo batem exatamente com as ruas
 // que aparecem nesses arquivos), agrupadas por
-// pavilhão no dropdown. Como é uma lista fixa,
-// as ruas aparecem sempre, mesmo antes de
-// processar qualquer comparativo.
+// pavilhão. Como é uma lista fixa, as ruas aparecem
+// sempre, mesmo antes de processar qualquer
+// comparativo.
 
 function popularFiltroRua(){
 
-    const select =
-    document.getElementById("filtroRua");
+    const opcoes =
+    document.getElementById("filtroRuaOpcoes");
 
-    if(!select) return;
+    if(!opcoes) return;
 
-    const valorAtual = select.value;
+    // preserva a seleção atual (se já existir) antes
+    // de reconstruir a lista de checkboxes
 
-    let html = `<option value="">Todas as Ruas</option>`;
+    const marcadasAntes =
+    new Set(
+        Array.from(
+            document.querySelectorAll(".filtroRuaItem")
+        )
+        .filter(chk => chk.checked)
+        .map(chk => chk.value)
+    );
+
+    const haviaSelecaoAnterior =
+    document.querySelectorAll(".filtroRuaItem").length > 0;
+
+    let html = `
+    <label class="filtro-pavilhao-item filtro-pavilhao-todos">
+        <input
+            type="checkbox"
+            id="filtroRuaTodos"
+            checked
+            onchange="alternarTodasRuas(this)">
+        Todas as Ruas
+    </label>
+    <div class="filtro-pavilhao-separador"></div>
+    `;
 
     PAVILHOES.forEach(pav=>{
 
@@ -1295,32 +1466,36 @@ function popularFiltroRua(){
 
         });
 
-        html += `<optgroup label="${pav.nome}">`;
+        html += `<div class="filtro-rua-grupo-titulo">${pav.nome}</div>`;
 
         ruasDoPavilhao.forEach(rua=>{
 
             const valor =
             String(rua).padStart(3,"0");
 
-            html += `<option value="${valor}">Rua ${valor}</option>`;
+            const marcado =
+            !haviaSelecaoAnterior ||
+            marcadasAntes.has(valor);
+
+            html += `
+            <label class="filtro-pavilhao-item">
+                <input
+                    type="checkbox"
+                    class="filtroRuaItem"
+                    value="${valor}"
+                    ${marcado ? "checked" : ""}
+                    onchange="atualizarSelecaoRuas()">
+                Rua ${valor}
+            </label>
+            `;
 
         });
 
-        html += `</optgroup>`;
-
     });
 
-    select.innerHTML = html;
+    opcoes.innerHTML = html;
 
-    // mantém a rua selecionada, se ainda existir
-    // na lista após repopular
-
-    if(valorAtual && Array.from(select.options)
-        .some(o=>o.value === valorAtual)){
-
-        select.value = valorAtual;
-
-    }
+    atualizarLabelRua();
 
 }
 
@@ -1354,16 +1529,8 @@ function obterFiltrado(){
     .getElementById("ordenarPor")
     ?.value || "sku";
 
-    const ruaFiltroRaw =
-    document
-    .getElementById("filtroRua")
-    ?.value
-    .trim() || "";
-
-    const ruaFiltro =
-    ruaFiltroRaw === ""
-    ? null
-    : Number(ruaFiltroRaw);
+    const ruasFiltro =
+    obterRuasFiltroAtual();
 
     const pavilhoesFiltro =
     obterPavilhoesFiltroAtual();
@@ -1417,14 +1584,18 @@ function obterFiltrado(){
         // rua: bate se a rua da apanha OU a rua de
         // qualquer pulmão do item corresponder ao filtro
 
+        // rua: bate se a rua da apanha OU a rua de
+        // qualquer pulmão do item estiver entre as
+        // ruas marcadas no filtro
+
         const ruaOk =
 
-            ruaFiltro === null ||
+            !ruasFiltro.length ||
 
-            extrairRua(item.enderecoApanha) === ruaFiltro ||
+            ruasFiltro.includes(extrairRua(item.enderecoApanha)) ||
 
             item.pulmoes.some(p=>
-                extrairRua(p.endereco) === ruaFiltro
+                ruasFiltro.includes(extrairRua(p.endereco))
             );
 
         return skuOk && qtdOk && valorOk && pavilhaoOk && ruaOk;
@@ -1492,13 +1663,6 @@ window.addEventListener("load",()=>{
     .getElementById("filtroQtdPulmoes")
     ?.addEventListener(
         "input",
-        aplicarFiltros
-    );
-
-    document
-    .getElementById("filtroRua")
-    ?.addEventListener(
-        "change",
         aplicarFiltros
     );
 
@@ -1874,15 +2038,16 @@ function obterResumoFiltrosAtivos(){
 
     }
 
-    const ruaFiltro =
-    document
-    .getElementById("filtroRua")
-    ?.value
-    .trim();
+    const ruasFiltro =
+    obterRuasFiltroAtual();
 
-    if(ruaFiltro){
+    if(ruasFiltro.length){
 
-        partes.push(`Rua: ${ruaFiltro}`);
+        partes.push(
+            `Rua: ${ruasFiltro
+                .map(r => String(r).padStart(3,"0"))
+                .join(", ")}`
+        );
 
     }
 
