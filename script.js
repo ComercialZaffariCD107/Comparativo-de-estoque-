@@ -2210,21 +2210,18 @@ h1{
                     <td>${l.tipo}</td>
                     <td class="centro">${sistemaTexto}</td>
                     <td class="encontrada">
-                        ${
-                            semQtd
-                            ? "—"
-                            : `<input
-                                type="number"
-                                inputmode="numeric"
-                                placeholder="0"
-                                class="input-encontrada"
-                                data-sku="${item.sku}"
-                                data-sistema="${sistemaComparacao}"
-                                data-sistema-un="${sistemaUn}"
-                                data-unidade="${unidade}"
-                                data-embalagem="${embalagemItem}"
-                            >`
-                        }
+                        <input
+                            type="number"
+                            inputmode="numeric"
+                            placeholder=""
+                            class="input-encontrada"
+                            data-sku="${item.sku}"
+                            data-sistema="${sistemaComparacao}"
+                            data-sistema-un="${sistemaUn}"
+                            data-unidade="${unidade}"
+                            data-embalagem="${embalagemItem}"
+                            data-sem-sistema="${semQtd ? "true" : "false"}"
+                        >
                     </td>
                 </tr>`;
 
@@ -2345,7 +2342,14 @@ function recalcularConferenciaImpressao(sku){
 
             totalEncontradoUn += encontradoUn;
 
-            if(encontrado === sistemaComparacao){
+            if(inp.dataset.semSistema === "true"){
+
+                // Apanha não tem qtd. de sistema pra comparar —
+                // só registra o que foi encontrado, sem marcar
+                // como confere/divergente
+                linha.classList.remove("confere","divergente");
+
+            }else if(encontrado === sistemaComparacao){
                 linha.classList.remove("divergente");
                 linha.classList.add("confere");
             }else{
