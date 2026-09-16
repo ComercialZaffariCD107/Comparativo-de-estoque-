@@ -1966,7 +1966,7 @@ window.addEventListener("load",()=>{
 // IMPRIMIR
 // =====================================
 
-function imprimirComparativo(){
+function imprimirContagem(){
 
     const dados = obterFiltrado();
 
@@ -1998,7 +1998,7 @@ function imprimirComparativo(){
 
 <meta charset="UTF-8">
 
-<title>Comparativo de Estoque CD x Comercial</title>
+<title>Relatório de Contagem — CD x Comercial</title>
 
 <style>
 
@@ -2356,7 +2356,7 @@ h1{
 
 <h1>
 
-📊 COMPARATIVO DE ESTOQUE CD LOCUS x COMERCIAL
+📋 RELATÓRIO DE CONTAGEM — CD LOCUS x COMERCIAL
 
 </h1>
 
@@ -2506,24 +2506,8 @@ h1{
 
     ${enderecosHtml}
 
-    ${
-        typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario)
-        ? `<div class="linha"><b>Valor Unitário:</b> ${formatarMoeda(item.valorUnitario)}</div>`
-        : ""
-    }
-
-    ${
-        typeof item.valorDivergencia === "number" && !isNaN(item.valorDivergencia)
-        ? `<div class="linha"><b>${item.valorDivergencia >= 0 ? "Impacto (Ganho):" : "Impacto (Perda):"}</b> ${formatarMoeda(item.valorDivergencia)}</div>`
-        : ""
-    }
-
     <div class="apuracao" data-apuracao-sku="${item.sku}" style="display:none;">
         <span data-diff-sku="${item.sku}"></span>
-        <span
-            data-impacto-sku="${item.sku}"
-            data-valor-unitario="${typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario) ? item.valorUnitario : ""}"
-        ></span>
     </div>
 
 </div>
@@ -2535,13 +2519,6 @@ h1{
     html += `
 
 <script>
-
-function formatarMoedaImpressao(valor){
-
-    return (valor < 0 ? "-R$ " : "R$ ") +
-    Math.abs(valor).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});
-
-}
 
 function recalcularConferenciaImpressao(sku){
 
@@ -2605,10 +2582,7 @@ function recalcularConferenciaImpressao(sku){
     const diffEl =
     document.querySelector('[data-diff-sku="' + sku + '"]');
 
-    const impactoEl =
-    document.querySelector('[data-impacto-sku="' + sku + '"]');
-
-    if(!apuracaoEl || !diffEl || !impactoEl) return;
+    if(!apuracaoEl || !diffEl) return;
 
     if(!algumPreenchido){
 
@@ -2625,23 +2599,6 @@ function recalcularConferenciaImpressao(sku){
     diffEl.textContent =
     "Diferença apurada: " + (diferencaApurada > 0 ? "+" : "") + diferencaApurada + " un.";
 
-    const valorUnitarioAttr = impactoEl.dataset.valorUnitario;
-
-    if(valorUnitarioAttr === ""){
-
-        impactoEl.textContent = "";
-
-    }else{
-
-        const valorUnitario = Number(valorUnitarioAttr);
-
-        const impacto = diferencaApurada * valorUnitario;
-
-        impactoEl.textContent =
-        "Impacto (contagem): " + (impacto > 0 ? "+" : "") + formatarMoedaImpressao(impacto);
-
-    }
-
 }
 
 document.addEventListener("input", function(e){
@@ -2655,6 +2612,409 @@ document.addEventListener("input", function(e){
 });
 
 <\/script>
+
+</body>
+
+</html>
+
+`;
+
+    janela.document.open();
+
+    janela.document.write(html);
+
+    janela.document.close();
+
+    janela.focus();
+
+}
+
+// =====================================
+// IMPRIMIR — RELATÓRIO FINANCEIRO
+// Tabela só com valores (sem endereço/contagem),
+// pensada pra gestão: totais no topo + listagem
+// de todos os itens ordenada pelo filtro ativo
+// =====================================
+
+function imprimirFinanceiro(){
+
+    const dados = obterFiltrado();
+
+    if(!dados.length){
+
+        alert(
+            "Nenhum item pra imprimir com os filtros atuais."
+        );
+
+        return;
+
+    }
+
+    const janela = window.open("", "_blank");
+
+    if(!janela){
+
+        alert("Permita pop-ups para este site.");
+
+        return;
+
+    }
+
+    const itensComValor =
+    dados.filter(x=>
+        typeof x.valorDivergencia === "number" &&
+        !isNaN(x.valorDivergencia)
+    );
+
+    const valorGanho =
+    itensComValor
+    .filter(x=>x.valorDivergencia > 0)
+    .reduce((s,x)=>s + x.valorDivergencia, 0);
+
+    const valorPerda =
+    itensComValor
+    .filter(x=>x.valorDivergencia < 0)
+    .reduce((s,x)=>s + Math.abs(x.valorDivergencia), 0);
+
+    const valorAbsoluto = valorGanho + valorPerda;
+
+    const valorLiquido = valorGanho - valorPerda;
+
+    const itensSemValor = dados.length - itensComValor.length;
+
+    const linhasTabela =
+    dados.map(item=>{
+
+        const temValor =
+        typeof item.valorDivergencia === "number" && !isNaN(item.valorDivergencia);
+
+        const classeLinha =
+        temValor
+        ? (item.valorDivergencia >= 0 ? "ganho" : "perda")
+        : "";
+
+        const valorUnitarioTexto =
+        typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario)
+        ? formatarMoeda(item.valorUnitario)
+        : "—";
+
+        const impactoTexto =
+        temValor
+        ? formatarMoeda(item.valorDivergencia)
+        : "—";
+
+        return `
+        <tr class="${classeLinha}">
+            <td class="tag">#${item.sku}</td>
+            <td>${item.descricao || "Sem descrição"}</td>
+            <td class="centro">${item.diferenca ?? "—"}</td>
+            <td class="centro">${valorUnitarioTexto}</td>
+            <td class="centro valor">${impactoTexto}</td>
+        </tr>`;
+
+    }).join("");
+
+    const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>Relatório Financeiro — CD x Comercial</title>
+
+<style>
+
+@page{
+
+    size:A4 landscape;
+
+    margin:10mm;
+
+}
+
+*{
+
+    box-sizing:border-box;
+
+}
+
+body{
+
+    font-family:Arial,Helvetica,sans-serif;
+
+    color:#222;
+
+    margin:0;
+
+}
+
+h1{
+
+    margin:0 0 4px 0;
+
+    text-align:center;
+
+    color:#1e3a8a;
+
+    font-size:18px;
+
+}
+
+.info{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    margin-bottom:14px;
+
+    font-size:12px;
+
+}
+
+.resumo{
+
+    display:grid;
+
+    grid-template-columns:repeat(4,1fr);
+
+    gap:10px;
+
+    margin-bottom:18px;
+
+}
+
+.resumo-card{
+
+    border:1px solid #d9d9d9;
+
+    border-radius:8px;
+
+    padding:10px 12px;
+
+    border-left:4px solid #2E63A8;
+
+}
+
+.resumo-card.ganho{ border-left-color:#1E9E5C; }
+.resumo-card.perda{ border-left-color:#D9333F; }
+.resumo-card.liquido{ border-left-color:#E48B00; }
+
+.resumo-label{
+
+    font-size:9px;
+
+    text-transform:uppercase;
+
+    letter-spacing:.04em;
+
+    color:#6b7280;
+
+    margin-bottom:4px;
+
+}
+
+.resumo-valor{
+
+    font-size:17px;
+
+    font-weight:bold;
+
+    color:#1e3a8a;
+
+}
+
+.resumo-card.ganho .resumo-valor{ color:#1E9E5C; }
+.resumo-card.perda .resumo-valor{ color:#D9333F; }
+.resumo-card.liquido .resumo-valor{ color:${valorLiquido >= 0 ? "#1E9E5C" : "#D9333F"}; }
+
+.aviso{
+
+    font-size:11px;
+
+    color:#6b7280;
+
+    margin-bottom:14px;
+
+}
+
+table.itens{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+    font-size:11px;
+
+}
+
+table.itens th{
+
+    text-align:left;
+
+    font-size:9px;
+
+    text-transform:uppercase;
+
+    letter-spacing:.03em;
+
+    color:#6b7280;
+
+    padding:6px 8px;
+
+    border-bottom:2px solid #333;
+
+}
+
+table.itens th.centro{ text-align:center; }
+
+table.itens td{
+
+    padding:5px 8px;
+
+    border-bottom:1px solid #eee;
+
+}
+
+table.itens td.tag{
+
+    font-weight:bold;
+
+    color:#1e3a8a;
+
+    white-space:nowrap;
+
+}
+
+table.itens td.centro{ text-align:center; }
+
+table.itens td.valor{ font-weight:bold; }
+
+table.itens tr.ganho td.valor{ color:#1E9E5C; }
+table.itens tr.perda td.valor{ color:#D9333F; }
+
+table.itens tr{ page-break-inside:avoid; }
+
+.toolbar{
+
+    display:flex;
+
+    justify-content:flex-end;
+
+    margin-bottom:12px;
+
+}
+
+.btn-imprimir{
+
+    background:#0E1B3D;
+
+    color:#fff;
+
+    border:none;
+
+    padding:9px 18px;
+
+    border-radius:6px;
+
+    font-size:13px;
+
+    font-weight:bold;
+
+    font-family:inherit;
+
+    cursor:pointer;
+
+}
+
+@media print{
+
+    .toolbar{ display:none; }
+
+    .resumo-card, table.itens{
+
+        -webkit-print-color-adjust:exact;
+
+        print-color-adjust:exact;
+
+    }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="toolbar">
+    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir</button>
+</div>
+
+<h1>
+
+💰 RELATÓRIO FINANCEIRO — DIVERGÊNCIAS DE ESTOQUE
+
+</h1>
+
+<div class="info">
+
+<div>
+
+<b>Data:</b> ${new Date().toLocaleString("pt-BR")}
+
+</div>
+
+<div>
+
+<b>Total:</b> ${dados.length} itens
+
+</div>
+
+</div>
+
+<div class="resumo">
+
+    <div class="resumo-card ganho">
+        <div class="resumo-label">Valor Ganho</div>
+        <div class="resumo-valor">${formatarMoeda(valorGanho)}</div>
+    </div>
+
+    <div class="resumo-card perda">
+        <div class="resumo-label">Valor Perda</div>
+        <div class="resumo-valor">${formatarMoeda(valorPerda)}</div>
+    </div>
+
+    <div class="resumo-card">
+        <div class="resumo-label">Impacto Total (Ganho + Perda)</div>
+        <div class="resumo-valor">${formatarMoeda(valorAbsoluto)}</div>
+    </div>
+
+    <div class="resumo-card liquido">
+        <div class="resumo-label">Saldo Líquido (Ganho - Perda)</div>
+        <div class="resumo-valor">${formatarMoeda(valorLiquido)}</div>
+    </div>
+
+</div>
+
+${itensSemValor > 0 ? `<div class="aviso">⚠️ ${itensSemValor} item(ns) sem valor unitário cadastrado — aparecem com "—" na coluna de impacto.</div>` : ""}
+
+<table class="itens">
+    <thead>
+        <tr>
+            <th>SKU</th>
+            <th>Descrição</th>
+            <th class="centro">Diferença</th>
+            <th class="centro">Valor Unitário</th>
+            <th class="centro">Impacto (R$)</th>
+        </tr>
+    </thead>
+    <tbody>
+        ${linhasTabela}
+    </tbody>
+</table>
 
 </body>
 
@@ -2748,13 +3108,71 @@ function obterResumoFiltrosAtivos(){
 
 }
 
-function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
 
-    const container =
-    document.getElementById("relatorioImagem");
+// =====================================
+// RELATÓRIOS EXECUTIVOS (WHATSAPP)
+// Divididos em dois relatórios independentes:
+//   - Operacional: volume de itens, apanha/pulmão,
+//     distribuição por nº de pulmões
+//   - Financeiro: impacto em R$ das divergências,
+//     cobertura de valor unitário, maiores ganhos/perdas
+// Cada um pode ser gerado com a base completa ou só
+// com o que está passando pelos filtros da tela.
+// =====================================
+
+function formatarMoedaRelatorio(v){
+
+    return (v || 0).toLocaleString(
+        "pt-BR",
+        {style:"currency",currency:"BRL"}
+    );
+
+}
+
+function linhaRelatorio(label, valor, classeExtra){
+
+    return `
+    <div class="ri-dist-linha">
+        <span class="ri-dist-label">${label}</span>
+        <span class="ri-dist-valor ${classeExtra || ""}">${valor}</span>
+    </div>
+    `;
+
+}
+
+function cabecalhoRelatorio(titulo, resumoFiltro){
 
     const agora =
     new Date().toLocaleString("pt-BR");
+
+    return `
+    <div class="ri-cabecalho">
+
+        <div class="ri-titulo">
+            ${titulo}
+        </div>
+
+        <div class="ri-faixa"></div>
+
+        <div class="ri-data">
+            ${agora}
+        </div>
+
+        ${resumoFiltro ? `<div class="ri-filtro-ativo">🔎 ${resumoFiltro}</div>` : ""}
+
+    </div>
+    `;
+
+}
+
+// =====================================
+// RELATÓRIO OPERACIONAL
+// =====================================
+
+function montarRelatorioOperacional(dadosBase = resultado, resumoFiltro = null){
+
+    const container =
+    document.getElementById("relatorioImagem");
 
     const total = dadosBase.length;
 
@@ -2779,9 +3197,67 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
     const quatroOuMais =
     dadosBase.filter(x=>x.qtdPulmoes>=4).length;
 
-    // =====================================
-    // IMPACTO FINANCEIRO
-    // =====================================
+    container.innerHTML = `
+
+    ${cabecalhoRelatorio("📊 Relatório Operacional — Comparativo de Estoque", resumoFiltro)}
+
+    <div class="ri-kpis">
+
+        <div class="ri-kpi">
+            <div class="ri-kpi-label">Total de Itens</div>
+            <div class="ri-kpi-valor">${total}</div>
+        </div>
+
+        <div class="ri-kpi">
+            <div class="ri-kpi-label">Sem Apanha</div>
+            <div class="ri-kpi-valor">${semApanha}</div>
+        </div>
+
+        <div class="ri-kpi">
+            <div class="ri-kpi-label">Sem Pulmão</div>
+            <div class="ri-kpi-valor">${semPulmao}</div>
+        </div>
+
+        <div class="ri-kpi">
+            <div class="ri-kpi-label">Total de Pulmões</div>
+            <div class="ri-kpi-valor">${totalPulmoes}</div>
+        </div>
+
+    </div>
+
+    <div class="ri-secao-titulo">
+        Distribuição por Nº de Pulmões
+    </div>
+
+    <div class="ri-distribuicao">
+
+        ${linhaRelatorio("Itens com 1 pulmão", umPulmao)}
+        ${linhaRelatorio("Itens com 2 pulmões", doisPulmoes)}
+        ${linhaRelatorio("Itens com 3 pulmões", tresPulmoes)}
+        ${linhaRelatorio("Itens com 4 ou mais pulmões", quatroOuMais)}
+        ${linhaRelatorio("Itens sem pulmão", semPulmao)}
+        ${linhaRelatorio("Itens sem apanha", semApanha)}
+
+    </div>
+
+    <div class="ri-rodape">
+        Gerado pelo Comparativo de Estoque CD x Comercial
+    </div>
+
+    `;
+
+}
+
+// =====================================
+// RELATÓRIO FINANCEIRO
+// =====================================
+
+function montarRelatorioFinanceiro(dadosBase = resultado, resumoFiltro = null){
+
+    const container =
+    document.getElementById("relatorioImagem");
+
+    const total = dadosBase.length;
 
     const itensComValor =
     dadosBase.filter(x=>
@@ -2823,44 +3299,20 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
     ? Math.round((itensComValor.length / total) * 100)
     : 0;
 
-    function formatarMoeda_(v){
-
-        return (v || 0).toLocaleString(
-            "pt-BR",
-            {style:"currency",currency:"BRL"}
-        );
-
-    }
-
-    const valorGanhoFormatado = formatarMoeda_(valorGanho);
-    const valorPerdaFormatado = formatarMoeda_(valorPerda);
-    const valorAbsolutoFormatado = formatarMoeda_(valorAbsoluto);
-    const valorLiquidoFormatado = formatarMoeda_(valorLiquido);
-    const impactoMedioFormatado = formatarMoeda_(impactoMedioPorItem);
-
-    function linha(label, valor, classeExtra){
-
-        return `
-        <div class="ri-dist-linha">
-            <span class="ri-dist-label">${label}</span>
-            <span class="ri-dist-valor ${classeExtra || ""}">${valor}</span>
-        </div>
-        `;
-
-    }
-
-    // =====================================
-    // TOP 5 MAIORES IMPACTOS (GANHO E PERDA)
-    // =====================================
+    const valorGanhoFormatado = formatarMoedaRelatorio(valorGanho);
+    const valorPerdaFormatado = formatarMoedaRelatorio(valorPerda);
+    const valorAbsolutoFormatado = formatarMoedaRelatorio(valorAbsoluto);
+    const valorLiquidoFormatado = formatarMoedaRelatorio(valorLiquido);
+    const impactoMedioFormatado = formatarMoedaRelatorio(impactoMedioPorItem);
 
     function itemCard(item, tipo){
 
         const impactoFormatado =
-        formatarMoeda_(item.valorDivergencia);
+        formatarMoedaRelatorio(item.valorDivergencia);
 
         const valorUnitarioFormatado =
         typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario)
-        ? formatarMoeda_(item.valorUnitario)
+        ? formatarMoedaRelatorio(item.valorUnitario)
         : "—";
 
         return `
@@ -2905,49 +3357,7 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
 
     container.innerHTML = `
 
-    <div class="ri-cabecalho">
-
-        <div class="ri-titulo">
-            📊 Relatório Executivo — Comparativo de Estoque
-        </div>
-
-        <div class="ri-faixa"></div>
-
-        <div class="ri-data">
-            ${agora}
-        </div>
-
-        ${resumoFiltro ? `<div class="ri-filtro-ativo">🔎 ${resumoFiltro}</div>` : ""}
-
-    </div>
-
-    <div class="ri-kpis">
-
-        <div class="ri-kpi">
-            <div class="ri-kpi-label">Total de Itens</div>
-            <div class="ri-kpi-valor">${total}</div>
-        </div>
-
-        <div class="ri-kpi">
-            <div class="ri-kpi-label">Sem Apanha</div>
-            <div class="ri-kpi-valor">${semApanha}</div>
-        </div>
-
-        <div class="ri-kpi">
-            <div class="ri-kpi-label">Sem Pulmão</div>
-            <div class="ri-kpi-valor">${semPulmao}</div>
-        </div>
-
-        <div class="ri-kpi">
-            <div class="ri-kpi-label">Total de Pulmões</div>
-            <div class="ri-kpi-valor">${totalPulmoes}</div>
-        </div>
-
-    </div>
-
-    <div class="ri-secao-titulo">
-        💰 Impacto Financeiro das Divergências
-    </div>
+    ${cabecalhoRelatorio("💰 Relatório Financeiro — Comparativo de Estoque", resumoFiltro)}
 
     <div class="ri-kpis">
 
@@ -2975,11 +3385,11 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
 
     <div class="ri-distribuicao" style="margin-bottom:26px;">
 
-        ${linha("Itens com ganho (divergência positiva)", `${itensGanho.length} itens`, "ri-dist-valor--ganho")}
-        ${linha("Itens com perda (divergência negativa)", `${itensPerda.length} itens`, "ri-dist-valor--perda")}
-        ${linha("Impacto médio por item (com valor)", impactoMedioFormatado)}
-        ${linha("Cobertura de valor unitário", `${itensComValor.length} de ${total} itens (${coberturaValores}%)`)}
-        ${itensSemValor > 0 ? linha("⚠️ Itens sem valor unitário cadastrado", `${itensSemValor} itens`, "ri-dist-valor--perda") : ""}
+        ${linhaRelatorio("Itens com ganho (divergência positiva)", `${itensGanho.length} itens`, "ri-dist-valor--ganho")}
+        ${linhaRelatorio("Itens com perda (divergência negativa)", `${itensPerda.length} itens`, "ri-dist-valor--perda")}
+        ${linhaRelatorio("Impacto médio por item (com valor)", impactoMedioFormatado)}
+        ${linhaRelatorio("Cobertura de valor unitário", `${itensComValor.length} de ${total} itens (${coberturaValores}%)`)}
+        ${itensSemValor > 0 ? linhaRelatorio("⚠️ Itens sem valor unitário cadastrado", `${itensSemValor} itens`, "ri-dist-valor--perda") : ""}
 
     </div>
 
@@ -2999,21 +3409,6 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
         ${top5PerdaHtml}
     </div>
 
-    <div class="ri-secao-titulo">
-        Distribuição por Nº de Pulmões
-    </div>
-
-    <div class="ri-distribuicao">
-
-        ${linha("Itens com 1 pulmão", umPulmao)}
-        ${linha("Itens com 2 pulmões", doisPulmoes)}
-        ${linha("Itens com 3 pulmões", tresPulmoes)}
-        ${linha("Itens com 4 ou mais pulmões", quatroOuMais)}
-        ${linha("Itens sem pulmão", semPulmao)}
-        ${linha("Itens sem apanha", semApanha)}
-
-    </div>
-
     <div class="ri-rodape">
         Gerado pelo Comparativo de Estoque CD x Comercial
     </div>
@@ -3022,131 +3417,51 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
 
 }
 
-async function gerarImagemRelatorio(){
-
-    if(!resultado.length){
-
-        alert(
-            "Processe os arquivos primeiro."
-        );
-
-        return;
-
-    }
-
-    montarRelatorioImagem();
-
-    if(document.fonts && document.fonts.ready){
-
-        await document.fonts.ready;
-
-    }
-
-    const elemento =
-    document.getElementById("relatorioImagem");
-
-    let canvas;
-
-    try{
-
-        canvas = await html2canvas(elemento, {
-
-            backgroundColor: "#EEF1F8",
-
-            scale: 2
-
-        });
-
-    }
-
-    catch(erro){
-
-        console.error(erro);
-
-        alert(
-            "Não consegui gerar a imagem. Veja o console (F12) pra detalhes."
-        );
-
-        return;
-
-    }
-
-    canvas.toBlob(async blob=>{
-
-        if(!blob){
-
-            alert("Falha ao gerar a imagem.");
-
-            return;
-
-        }
-
-        try{
-
-            await navigator.clipboard.write([
-
-                new ClipboardItem({
-                    "image/png": blob
-                })
-
-            ]);
-
-            alert(
-                "✅ Imagem copiada! Agora é só abrir a conversa no WhatsApp e colar (Ctrl+V)."
-            );
-
-        }
-
-        catch(erro){
-
-            console.error(erro);
-
-            const link = document.createElement("a");
-
-            link.href = URL.createObjectURL(blob);
-
-            link.download =
-            `comparativo_estoque_${new Date().toISOString().slice(0,10)}.png`;
-
-            link.click();
-
-            alert(
-                "Seu navegador não permitiu copiar direto pro clipboard, então baixei a imagem — é só anexar ela no WhatsApp."
-            );
-
-        }
-
-    }, "image/png");
-
-}
-
 // =====================================
-// RELATÓRIO EXECUTIVO — FILTRADO
+// GERAÇÃO DA IMAGEM (comum aos dois
+// relatórios) — monta o HTML certo, tira
+// o print com html2canvas e copia pro
+// clipboard (ou baixa, se o navegador
+// não deixar copiar direto)
 // =====================================
-// Mesmo modelo do relatório executivo acima, mas calcula os
-// KPIs/distribuições só em cima do que está passando pelos
-// filtros ativos da tela (SKU, pulmões, ganho/perda e — o mais
-// pedido — pavilhão). Mostra um resumo dos filtros aplicados
-// no topo da imagem.
 
-async function gerarImagemRelatorioFiltrado(){
+const RELATORIOS_MONTADORES = {
+    operacional: montarRelatorioOperacional,
+    financeiro: montarRelatorioFinanceiro
+};
 
-    const dadosFiltrados =
-    obterFiltrado();
+const RELATORIOS_NOME_ARQUIVO = {
+    operacional: "comparativo_estoque_operacional",
+    financeiro: "comparativo_estoque_financeiro"
+};
 
-    if(!dadosFiltrados.length){
+async function gerarRelatorioImagem(tipo, filtrado){
+
+    const montador = RELATORIOS_MONTADORES[tipo];
+
+    if(!montador){
+        console.error("Tipo de relatório inválido:", tipo);
+        return;
+    }
+
+    const dadosBase =
+    filtrado ? obterFiltrado() : resultado;
+
+    if(!dadosBase.length){
 
         alert(
-            "Nenhum item pra gerar relatório com os filtros atuais."
+            filtrado
+            ? "Nenhum item pra gerar relatório com os filtros atuais."
+            : "Processe os arquivos primeiro."
         );
 
         return;
 
     }
 
-    montarRelatorioImagem(
-        dadosFiltrados,
-        obterResumoFiltrosAtivos()
+    montador(
+        dadosBase,
+        filtrado ? obterResumoFiltrosAtivos() : null
     );
 
     if(document.fonts && document.fonts.ready){
@@ -3218,8 +3533,10 @@ async function gerarImagemRelatorioFiltrado(){
 
             link.href = URL.createObjectURL(blob);
 
+            const sufixo = filtrado ? "_filtrado" : "";
+
             link.download =
-            `comparativo_estoque_filtrado_${new Date().toISOString().slice(0,10)}.png`;
+            `${RELATORIOS_NOME_ARQUIVO[tipo]}${sufixo}_${new Date().toISOString().slice(0,10)}.png`;
 
             link.click();
 

@@ -12,7 +12,7 @@
         Comparativo de Estoque CD x Comercial
     </title>
 
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=10">
 
     <!-- Papa Parse -->
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -493,27 +493,75 @@
 
                 <button
                     class="btn-exportar"
-                    onclick="imprimirComparativo()">
+                    onclick="imprimirContagem()">
 
-                    🖨️ Imprimir
-
-                </button>
-
-                <button
-                    class="btn-whatsapp"
-                    onclick="gerarImagemRelatorio()">
-
-                    📸 Relatório Executivo (WhatsApp)
+                    🖨️ Imprimir Contagem
 
                 </button>
 
                 <button
-                    class="btn-whatsapp btn-whatsapp-filtrado"
-                    onclick="gerarImagemRelatorioFiltrado()">
+                    class="btn-exportar btn-exportar-financeiro"
+                    onclick="imprimirFinanceiro()">
 
-                    📸🔎 Relatório Executivo (Filtrado)
+                    🖨️💰 Imprimir Financeiro
 
                 </button>
+
+            </div>
+
+            <div class="relatorio-grupos">
+
+                <div class="relatorio-grupo">
+
+                    <span class="relatorio-grupo-titulo">📊 Relatório Operacional</span>
+
+                    <div class="acoes acoes-relatorio">
+
+                        <button
+                            class="btn-whatsapp"
+                            onclick="gerarRelatorioImagem('operacional', false)">
+
+                            📸 Completo (WhatsApp)
+
+                        </button>
+
+                        <button
+                            class="btn-whatsapp btn-whatsapp-filtrado"
+                            onclick="gerarRelatorioImagem('operacional', true)">
+
+                            📸🔎 Filtrado (WhatsApp)
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <div class="relatorio-grupo">
+
+                    <span class="relatorio-grupo-titulo">💰 Relatório Financeiro</span>
+
+                    <div class="acoes acoes-relatorio">
+
+                        <button
+                            class="btn-whatsapp"
+                            onclick="gerarRelatorioImagem('financeiro', false)">
+
+                            📸 Completo (WhatsApp)
+
+                        </button>
+
+                        <button
+                            class="btn-whatsapp btn-whatsapp-filtrado"
+                            onclick="gerarRelatorioImagem('financeiro', true)">
+
+                            📸🔎 Filtrado (WhatsApp)
+
+                        </button>
+
+                    </div>
+
+                </div>
 
             </div>
 
@@ -554,7 +602,7 @@
 
     </div>
 
-<script src="script.js?v=6"></script>
+<script src="script.js?v=8"></script>
 <script src="sync.js?v=2"></script>
 
 </body>
