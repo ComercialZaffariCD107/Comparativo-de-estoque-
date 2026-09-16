@@ -12,7 +12,7 @@
         Comparativo de Estoque CD x Comercial
     </title>
 
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=8">
 
     <!-- Papa Parse -->
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -369,10 +369,47 @@
 
             <div class="filtros">
 
-                <input
-                    type="text"
-                    id="filtroSKU"
-                    placeholder="Filtrar por SKU ou descrição">
+                <div class="filtro-pavilhao-multi" id="filtroSkuMulti">
+
+                    <button
+                        type="button"
+                        class="filtro-pavilhao-btn"
+                        id="filtroSkuBtn"
+                        onclick="toggleSkuDropdown()">
+
+                        <span id="filtroSkuLabel">Todos os SKUs</span>
+                        <span class="filtro-pavilhao-seta">▾</span>
+
+                    </button>
+
+                    <div
+                        class="filtro-pavilhao-opcoes filtro-sku-opcoes"
+                        id="filtroSkuOpcoes"
+                        style="display:none;">
+
+                        <input
+                            type="text"
+                            id="filtroSkuBusca"
+                            class="filtro-sku-busca"
+                            placeholder="Buscar por SKU ou descrição..."
+                            oninput="filtrarListaSkus()">
+
+                        <label class="filtro-pavilhao-item filtro-pavilhao-todos">
+                            <input
+                                type="checkbox"
+                                id="filtroSkuTodos"
+                                checked
+                                onchange="alternarTodosSkus(this)">
+                            Todos os SKUs
+                        </label>
+
+                        <div class="filtro-pavilhao-separador"></div>
+
+                        <div id="filtroSkuLista"></div>
+
+                    </div>
+
+                </div>
 
                 <input
                     type="number"
@@ -517,7 +554,7 @@
 
     </div>
 
-<script src="script.js?v=4"></script>
+<script src="script.js?v=5"></script>
 <script src="sync.js?v=2"></script>
 
 </body>

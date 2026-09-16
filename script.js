@@ -151,6 +151,18 @@ document.addEventListener("click", function(e){
 
     }
 
+    const containerSku =
+    document.getElementById("filtroSkuMulti");
+
+    const opcoesSku =
+    document.getElementById("filtroSkuOpcoes");
+
+    if(containerSku && opcoesSku && !containerSku.contains(e.target)){
+
+        opcoesSku.style.display = "none";
+
+    }
+
 });
 
 function alternarTodosPavilhoes(chkTodos){
@@ -1008,6 +1020,13 @@ function gerarComparativo(){
     }
 
     try{
+        popularFiltroSku();
+    }
+    catch(erro){
+        console.error("Falha em popularFiltroSku():", erro);
+    }
+
+    try{
         renderizarCards();
     }
     catch(erro){
@@ -1545,14 +1564,241 @@ function popularFiltroRua(){
 
 }
 
-function obterFiltrado(){
+// =====================================
+// FILTRO DE SKU (multi-seleção, mesmo
+// padrão do filtro de rua/pavilhão)
+// =====================================
 
-    const skuFiltro =
+function popularFiltroSku(){
+
+    const lista =
+    document.getElementById("filtroSkuLista");
+
+    if(!lista) return;
+
+    // preserva a seleção atual (se já existir) antes
+    // de reconstruir a lista de checkboxes
+
+    const marcadosAntes =
+    new Set(
+        Array.from(
+            document.querySelectorAll(".filtroSkuItem")
+        )
+        .filter(chk => chk.checked)
+        .map(chk => chk.value)
+    );
+
+    const haviaSelecaoAnterior =
+    document.querySelectorAll(".filtroSkuItem").length > 0;
+
+    let html = "";
+
+    resultado.forEach(item=>{
+
+        const marcado =
+        !haviaSelecaoAnterior ||
+        marcadosAntes.has(item.sku);
+
+        const descricaoEscapada =
+        (item.descricao || "")
+        .replace(/"/g,"&quot;");
+
+        html += `
+        <label class="filtro-pavilhao-item filtro-sku-item" data-sku-busca="${item.sku.toLowerCase()} ${descricaoEscapada.toLowerCase()}">
+            <input
+                type="checkbox"
+                class="filtroSkuItem"
+                value="${item.sku}"
+                ${marcado ? "checked" : ""}
+                onchange="atualizarSelecaoSkus()">
+            <span class="filtro-sku-item-textos">
+                <span class="filtro-sku-item-sku">#${item.sku}</span>
+                <span class="filtro-sku-item-desc">${item.descricao || "Sem descrição"}</span>
+            </span>
+        </label>
+        `;
+
+    });
+
+    lista.innerHTML = html;
+
+    const buscaAtual =
+    document.getElementById("filtroSkuBusca");
+
+    if(buscaAtual) buscaAtual.value = "";
+
+    atualizarLabelSku();
+
+}
+
+function toggleSkuDropdown(){
+
+    const opcoes =
+    document.getElementById("filtroSkuOpcoes");
+
+    if(!opcoes) return;
+
+    opcoes.style.display =
+    opcoes.style.display === "none"
+    ? "block"
+    : "none";
+
+}
+
+function alternarTodosSkus(chkTodos){
+
     document
-    .getElementById("filtroSKU")
-    .value
+    .querySelectorAll(".filtroSkuItem")
+    .forEach(chk=>{
+
+        chk.checked = chkTodos.checked;
+
+    });
+
+    atualizarLabelSku();
+
+    if(typeof aplicarFiltros === "function"){
+
+        aplicarFiltros();
+
+    }
+
+}
+
+function atualizarSelecaoSkus(){
+
+    const itens =
+    document.querySelectorAll(".filtroSkuItem");
+
+    const chkTodos =
+    document.getElementById("filtroSkuTodos");
+
+    const todosMarcados =
+    Array.from(itens)
+    .every(chk => chk.checked);
+
+    if(chkTodos){
+
+        chkTodos.checked = todosMarcados;
+
+    }
+
+    atualizarLabelSku();
+
+    if(typeof aplicarFiltros === "function"){
+
+        aplicarFiltros();
+
+    }
+
+}
+
+function atualizarLabelSku(){
+
+    const label =
+    document.getElementById("filtroSkuLabel");
+
+    if(!label) return;
+
+    const itens =
+    Array.from(
+        document.querySelectorAll(".filtroSkuItem")
+    );
+
+    const marcados =
+    itens.filter(chk => chk.checked);
+
+    if(!itens.length){
+
+        label.innerText = "Todos os SKUs";
+
+    }
+    else if(marcados.length === 0){
+
+        label.innerText = "Nenhum SKU";
+
+    }
+    else if(marcados.length === itens.length){
+
+        label.innerText = "Todos os SKUs";
+
+    }
+    else if(marcados.length <= 2){
+
+        label.innerText =
+        marcados
+        .map(chk => `#${chk.value}`)
+        .join(", ");
+
+    }
+    else{
+
+        label.innerText =
+        `${marcados.length} SKUs selecionados`;
+
+    }
+
+}
+
+// busca dentro do dropdown: só filtra visualmente
+// quais checkboxes aparecem na lista, não mexe na
+// seleção marcada nem no filtro já aplicado
+
+function filtrarListaSkus(){
+
+    const busca =
+    (document.getElementById("filtroSkuBusca")?.value || "")
     .toLowerCase()
     .trim();
+
+    document
+    .querySelectorAll(".filtro-sku-item")
+    .forEach(label=>{
+
+        const alvo =
+        label.dataset.skuBusca || "";
+
+        label.style.display =
+        (busca === "" || alvo.includes(busca))
+        ? "flex"
+        : "none";
+
+    });
+
+}
+
+// Array vazio = todos marcados = sem filtro (mesmo
+// comportamento do filtro de rua/pavilhão).
+function obterSkusFiltroAtual(){
+
+    const itens =
+    Array.from(
+        document.querySelectorAll(".filtroSkuItem")
+    );
+
+    if(!itens.length){
+
+        return [];
+
+    }
+
+    const marcados =
+    itens.filter(chk => chk.checked);
+
+    if(marcados.length === itens.length){
+
+        return [];
+
+    }
+
+    return marcados.map(chk => chk.value);
+
+}
+
+function obterFiltrado(){
+
+    const skusFiltro =
+    obterSkusFiltroAtual();
 
     const qtdFiltroRaw =
     document
@@ -1583,19 +1829,14 @@ function obterFiltrado(){
 
     let filtrado = resultado.filter(item=>{
 
-        // SKU: correspondência EXATA — o código
-        // precisa ser idêntico ao que foi digitado,
-        // não "contém"
+        // SKU: multi-seleção — array vazio = sem
+        // filtro (todos), senão precisa estar marcado
 
         const skuOk =
 
-            skuFiltro === "" ||
+            !skusFiltro.length ||
 
-            item.sku.toLowerCase() === skuFiltro ||
-
-            (item.descricao || "")
-            .toLowerCase()
-            .includes(skuFiltro);
+            skusFiltro.includes(item.sku);
 
         // filtro EXATO — não é "a partir de"
 
@@ -1697,13 +1938,6 @@ function aplicarFiltros(){
 }
 
 window.addEventListener("load",()=>{
-
-    document
-    .getElementById("filtroSKU")
-    ?.addEventListener(
-        "input",
-        aplicarFiltros
-    );
 
     document
     .getElementById("filtroQtdPulmoes")
@@ -2446,15 +2680,16 @@ function obterResumoFiltrosAtivos(){
 
     const partes = [];
 
-    const skuFiltro =
-    document
-    .getElementById("filtroSKU")
-    ?.value
-    .trim();
+    const skusFiltro =
+    obterSkusFiltroAtual();
 
-    if(skuFiltro){
+    if(skusFiltro.length){
 
-        partes.push(`SKU/Descrição: "${skuFiltro}"`);
+        partes.push(
+            skusFiltro.length <= 3
+            ? `SKU: ${skusFiltro.map(s => "#" + s).join(", ")}`
+            : `SKU: ${skusFiltro.length} selecionados`
+        );
 
     }
 
