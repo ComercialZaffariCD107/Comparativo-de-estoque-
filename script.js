@@ -898,9 +898,26 @@ function gerarComparativo(){
             `${p.CODRUA}.${p.NROPREDIO}.${p.NROAPARTAMENTO}.${p.NROSALA}`,
 
             quantidade:
-            Number(p.QTD_END || 0)
+            Number(p.QTD_END || 0),
+
+            embalagem:
+            Number(p.EMBALAGEM || 0)
 
         }));
+
+        // EMBALAGEM = quantidade de unidades por caixa desse SKU.
+        // É um atributo do produto, então pega da posição de apanha
+        // primeiro; se não tiver (ou vier 0/1), tenta achar nos
+        // pulmões. Se nada tiver embalagem > 1, o item é
+        // considerado "de fato contado por unidade" (embalagem 1).
+
+        const embalagemApanha =
+        Number(posicaoApanha?.EMBALAGEM || 0);
+
+        const embalagemItem =
+        embalagemApanha > 1
+        ? embalagemApanha
+        : (pulmoes.find(p=>p.embalagem > 1)?.embalagem || embalagemApanha || 1);
 
         const valorUnitario =
         mapaValores[sku] ?? null;
@@ -947,6 +964,8 @@ function gerarComparativo(){
             pulmoes,
 
             qtdPulmoes: pulmoes.length,
+
+            embalagem: embalagemItem,
 
             valorUnitario,
 
@@ -1245,10 +1264,8 @@ function renderizarCards(dados = resultado){
         // monta a lista de endereços do item: apanha
         // primeiro (sem qtd. de sistema fixa), depois
         // cada pulmão com sua quantidade de sistema.
-        // cada linha ganha um input de "Qtd. Encontrada"
-        // usado na conferência física — não é salvo em
-        // lugar nenhum, só serve pra conferir na tela e
-        // sair na impressão
+        // a conferência física (Qtd. Encontrada) só existe
+        // na impressão agora — aqui na tela é só consulta
 
         const linhasEndereco = [];
 
@@ -1285,15 +1302,6 @@ function renderizarCards(dados = resultado){
                     <span class="endereco-tag">${l.endereco}</span>
                     <span class="endereco-tipo ${l.tipo === "Apanha" ? "tipo-apanha" : ""}">${l.tipo}</span>
                     <span class="qtd-sistema">${semQtd ? "—" : l.qtdSistema}</span>
-                    <input
-                        class="input-encontrada"
-                        type="number"
-                        inputmode="numeric"
-                        placeholder="0"
-                        data-sku="${item.sku}"
-                        data-endereco="${l.endereco}"
-                        data-sistema="${semQtd ? 0 : l.qtdSistema}"
-                    >
                 </div>`;
 
           }).join("")
@@ -1302,8 +1310,6 @@ function renderizarCards(dados = resultado){
                 <span class="endereco-tag">—</span>
                 <span class="endereco-tipo">Sem endereço</span>
                 <span class="qtd-sistema">—</span>
-                <input class="input-encontrada" type="number" inputmode="numeric" placeholder="0"
-                    data-sku="${item.sku}" data-endereco="sem-endereco" data-sistema="0">
             </div>`;
 
         let diferencaHtml = "";
@@ -1372,7 +1378,6 @@ function renderizarCards(dados = resultado){
                         <span>Endereço</span>
                         <span>Tipo</span>
                         <span>Qtd. Sistema</span>
-                        <span>Qtd. Encontrada</span>
                     </div>
 
                     ${enderecosHtml}
@@ -1415,22 +1420,6 @@ function renderizarCards(dados = resultado){
                     : ""
                 }
 
-                <div class="item-card-footer">
-
-                    <div class="footer-bloco">
-                        <div class="label">Diferença apurada</div>
-                        <div class="valor neutro" data-diff-sku="${item.sku}">— aguardando contagem</div>
-                    </div>
-
-                    <div class="footer-bloco destaque">
-                        <div>
-                            <div class="label">Impacto (contagem)</div>
-                            <div class="valor" data-impacto-sku="${item.sku}">—</div>
-                        </div>
-                    </div>
-
-                </div>
-
             </div>
 
         </div>
@@ -1441,121 +1430,6 @@ function renderizarCards(dados = resultado){
     container.innerHTML = html;
 
 }
-
-// =====================================
-// CONFERÊNCIA — QTD. ENCONTRADA POR ENDEREÇO
-// (só existe na tela/impressão, não é salva
-// em lugar nenhum — some ao recarregar)
-// =====================================
-
-function recalcularConferencia(sku){
-
-    const item = resultado.find(x=>x.sku === sku);
-
-    if(!item){
-        return;
-    }
-
-    const inputs =
-    document.querySelectorAll(`.input-encontrada[data-sku="${sku}"]`);
-
-    let totalSistema = 0;
-    let totalEncontrado = 0;
-    let algumPreenchido = false;
-
-    inputs.forEach(inp=>{
-
-        const sistema = Number(inp.dataset.sistema) || 0;
-        totalSistema += sistema;
-
-        const valorDigitado = inp.value.trim();
-
-        if(valorDigitado !== ""){
-
-            algumPreenchido = true;
-
-            const encontrado = Number(valorDigitado) || 0;
-            totalEncontrado += encontrado;
-
-            if(encontrado === sistema){
-                inp.classList.remove("divergente");
-                inp.classList.add("confere");
-            }
-            else{
-                inp.classList.remove("confere");
-                inp.classList.add("divergente");
-            }
-
-        }
-        else{
-
-            inp.classList.remove("confere","divergente");
-
-        }
-
-    });
-
-    const diffEl =
-    document.querySelector(`[data-diff-sku="${sku}"]`);
-
-    const impactoEl =
-    document.querySelector(`[data-impacto-sku="${sku}"]`);
-
-    if(!diffEl || !impactoEl){
-        return;
-    }
-
-    if(!algumPreenchido){
-
-        diffEl.textContent = "— aguardando contagem";
-        diffEl.className = "valor neutro";
-        impactoEl.textContent = "—";
-        impactoEl.style.color = "";
-
-        return;
-
-    }
-
-    const diferencaApurada = totalEncontrado - totalSistema;
-
-    const impacto =
-    typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario)
-    ? diferencaApurada * item.valorUnitario
-    : null;
-
-    diffEl.textContent =
-    (diferencaApurada > 0 ? "+" : "") + diferencaApurada + " un.";
-
-    diffEl.className =
-    "valor " + (diferencaApurada > 0 ? "ganho" : diferencaApurada < 0 ? "perda" : "neutro");
-
-    if(impacto === null){
-
-        impactoEl.textContent = "sem valor unit.";
-        impactoEl.style.color = "";
-
-    }
-    else{
-
-        impactoEl.textContent =
-        (impacto > 0 ? "+" : "") + formatarMoeda(impacto);
-
-        impactoEl.style.color =
-        impacto > 0 ? "#8FE0B4" : impacto < 0 ? "#FF9AA2" : "#fff";
-
-    }
-
-}
-
-document.addEventListener("input", (e)=>{
-
-    if(e.target.classList && e.target.classList.contains("input-encontrada")){
-
-        recalcularConferencia(e.target.dataset.sku);
-
-    }
-
-});
 
 // =====================================
 // FILTROS
@@ -2098,6 +1972,114 @@ h1{
 
 }
 
+.enderecos td.encontrada input{
+
+    width:64px;
+
+    text-align:center;
+
+    font-weight:bold;
+
+    font-size:12px;
+
+    font-family:inherit;
+
+    color:inherit;
+
+    border:1.3px solid #aaa;
+
+    border-radius:4px;
+
+    padding:2px 4px;
+
+    background:#fff;
+
+}
+
+.enderecos tr.confere td.encontrada input{
+
+    border-color:#1E9E5C;
+
+    color:#1E9E5C;
+
+    background:#eafaf0;
+
+}
+
+.enderecos tr.divergente td.encontrada input{
+
+    border-color:#D9333F;
+
+    color:#D9333F;
+
+    background:#fdecee;
+
+}
+
+.toolbar{
+
+    display:flex;
+
+    justify-content:flex-end;
+
+    gap:8px;
+
+    margin-bottom:12px;
+
+}
+
+.btn-imprimir{
+
+    background:#0E1B3D;
+
+    color:#fff;
+
+    border:none;
+
+    padding:9px 18px;
+
+    border-radius:6px;
+
+    font-size:13px;
+
+    font-weight:bold;
+
+    font-family:inherit;
+
+    cursor:pointer;
+
+}
+
+.aviso-contagem{
+
+    font-size:11px;
+
+    color:#6b7280;
+
+    margin:-8px 0 14px 0;
+
+}
+
+@media print{
+
+    .toolbar, .aviso-contagem{
+
+        display:none;
+
+    }
+
+    .enderecos td.encontrada input{
+
+        border:1px solid #999;
+
+        -webkit-print-color-adjust:exact;
+
+        print-color-adjust:exact;
+
+    }
+
+}
+
 .apuracao{
 
     margin-top:8px;
@@ -2134,6 +2116,10 @@ h1{
 
 <body>
 
+<div class="toolbar">
+    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir</button>
+</div>
+
 <h1>
 
 📊 COMPARATIVO DE ESTOQUE CD LOCUS x COMERCIAL
@@ -2156,15 +2142,17 @@ h1{
 
 </div>
 
+<p class="aviso-contagem">Preencha a "Qtd. Encontrada" durante a contagem física. Quando o endereço indicar "CX", conte e informe em caixas; quando indicar "UN", conte e informe em unidades.</p>
+
 `;
 
     dados.forEach(item=>{
 
         // monta as mesmas linhas de endereço da tela
-        // (apanha + pulmões) e busca no DOM o que foi
-        // digitado em "Qtd. Encontrada" pra cada uma —
-        // esse valor nunca é salvo, só existe na tela
-        // e agora vai junto pra impressão
+        // (apanha + pulmões). A "Qtd. Encontrada" só
+        // existe aqui na impressão — o operador preenche
+        // na hora da contagem física, direto neste
+        // documento (nada é salvo, some ao fechar/recarregar)
 
         const linhasEndereco = [];
 
@@ -2188,9 +2176,7 @@ h1{
 
         });
 
-        let totalSistema = 0;
-        let totalEncontrado = 0;
-        let algumPreenchido = false;
+        const embalagemItem = Number(item.embalagem) || 1;
 
         const linhasHtml =
 
@@ -2199,41 +2185,47 @@ h1{
         ? linhasEndereco.map(l=>{
 
             const semQtd = l.qtdSistema === null || l.qtdSistema === undefined;
-            const sistema = semQtd ? 0 : l.qtdSistema;
+            const sistemaUn = semQtd ? 0 : l.qtdSistema;
 
-            totalSistema += sistema;
+            // só mostra em CX quando o item realmente é
+            // paletizado em caixa (embalagem > 1) e a
+            // quantidade do endereço divide certinho por
+            // caixa. Caixa quebrada/fracionada ou item que
+            // é contado por unidade continua em UN.
 
-            const inputTela =
-            document.querySelector(
-                `.input-encontrada[data-sku="${item.sku}"][data-endereco="${l.endereco}"]`
-            );
+            const podeConverterCx =
+            !semQtd && embalagemItem > 1 && sistemaUn % embalagemItem === 0;
 
-            const valorDigitado =
-            inputTela ? inputTela.value.trim() : "";
+            const unidade = semQtd ? "" : (podeConverterCx ? "CX" : "UN");
 
-            let classeLinha = "";
+            const sistemaComparacao =
+            semQtd ? 0 : (podeConverterCx ? sistemaUn / embalagemItem : sistemaUn);
 
-            let encontradoTexto = "—";
-
-            if(valorDigitado !== ""){
-
-                algumPreenchido = true;
-
-                const encontrado = Number(valorDigitado) || 0;
-                totalEncontrado += encontrado;
-                encontradoTexto = String(encontrado);
-
-                classeLinha +=
-                " " + (encontrado === sistema ? "confere" : "divergente");
-
-            }
+            const sistemaTexto =
+            semQtd ? "—" : `${sistemaComparacao} ${unidade}`;
 
             return `
-                <tr class="${l.tipo === "Apanha" ? "apanha" : ""} ${classeLinha}">
+                <tr class="${l.tipo === "Apanha" ? "apanha" : ""}" data-linha-sku="${item.sku}">
                     <td class="tag">${l.endereco}</td>
                     <td>${l.tipo}</td>
-                    <td class="centro">${semQtd ? "—" : sistema}</td>
-                    <td class="encontrada">${encontradoTexto}</td>
+                    <td class="centro">${sistemaTexto}</td>
+                    <td class="encontrada">
+                        ${
+                            semQtd
+                            ? "—"
+                            : `<input
+                                type="number"
+                                inputmode="numeric"
+                                placeholder="${unidade}"
+                                class="input-encontrada"
+                                data-sku="${item.sku}"
+                                data-sistema="${sistemaComparacao}"
+                                data-sistema-un="${sistemaUn}"
+                                data-unidade="${unidade}"
+                                data-embalagem="${embalagemItem}"
+                            >`
+                        }
+                    </td>
                 </tr>`;
 
           }).join("")
@@ -2254,25 +2246,6 @@ h1{
                 ${linhasHtml}
             </tbody>
         </table>`;
-
-        let apuracaoHtml = "";
-
-        if(algumPreenchido){
-
-            const diferencaApurada = totalEncontrado - totalSistema;
-
-            const impacto =
-            typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario)
-            ? diferencaApurada * item.valorUnitario
-            : null;
-
-            apuracaoHtml = `
-            <div class="apuracao">
-                <span>Diferença apurada: ${diferencaApurada > 0 ? "+" : ""}${diferencaApurada} un.</span>
-                <span>${impacto === null ? "" : "Impacto (contagem): " + (impacto > 0 ? "+" : "") + formatarMoeda(impacto)}</span>
-            </div>`;
-
-        }
 
         const diferencaHtml =
 
@@ -2314,7 +2287,13 @@ h1{
         : ""
     }
 
-    ${apuracaoHtml}
+    <div class="apuracao" data-apuracao-sku="${item.sku}" style="display:none;">
+        <span data-diff-sku="${item.sku}"></span>
+        <span
+            data-impacto-sku="${item.sku}"
+            data-valor-unitario="${typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario) ? item.valorUnitario : ""}"
+        ></span>
+    </div>
 
 </div>
 
@@ -2323,6 +2302,121 @@ h1{
     });
 
     html += `
+
+<script>
+
+function formatarMoedaImpressao(valor){
+
+    return (valor < 0 ? "-R$ " : "R$ ") +
+    Math.abs(valor).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});
+
+}
+
+function recalcularConferenciaImpressao(sku){
+
+    const inputs =
+    document.querySelectorAll('.input-encontrada[data-sku="' + sku + '"]');
+
+    let totalSistemaUn = 0;
+    let totalEncontradoUn = 0;
+    let algumPreenchido = false;
+
+    inputs.forEach(function(inp){
+
+        const sistemaComparacao = Number(inp.dataset.sistema) || 0;
+        const sistemaUn = Number(inp.dataset.sistemaUn) || 0;
+
+        totalSistemaUn += sistemaUn;
+
+        const valorDigitado = inp.value.trim();
+
+        const linha = inp.closest("tr");
+
+        if(valorDigitado !== ""){
+
+            algumPreenchido = true;
+
+            const encontrado = Number(valorDigitado) || 0;
+
+            const embalagem = Number(inp.dataset.embalagem) || 1;
+
+            const encontradoUn =
+            inp.dataset.unidade === "CX" ? encontrado * embalagem : encontrado;
+
+            totalEncontradoUn += encontradoUn;
+
+            if(encontrado === sistemaComparacao){
+                linha.classList.remove("divergente");
+                linha.classList.add("confere");
+            }else{
+                linha.classList.remove("confere");
+                linha.classList.add("divergente");
+            }
+
+        }else{
+
+            linha.classList.remove("confere","divergente");
+
+        }
+
+    });
+
+    const apuracaoEl =
+    document.querySelector('[data-apuracao-sku="' + sku + '"]');
+
+    const diffEl =
+    document.querySelector('[data-diff-sku="' + sku + '"]');
+
+    const impactoEl =
+    document.querySelector('[data-impacto-sku="' + sku + '"]');
+
+    if(!apuracaoEl || !diffEl || !impactoEl) return;
+
+    if(!algumPreenchido){
+
+        apuracaoEl.style.display = "none";
+
+        return;
+
+    }
+
+    apuracaoEl.style.display = "flex";
+
+    const diferencaApurada = totalEncontradoUn - totalSistemaUn;
+
+    diffEl.textContent =
+    "Diferença apurada: " + (diferencaApurada > 0 ? "+" : "") + diferencaApurada + " un.";
+
+    const valorUnitarioAttr = impactoEl.dataset.valorUnitario;
+
+    if(valorUnitarioAttr === ""){
+
+        impactoEl.textContent = "";
+
+    }else{
+
+        const valorUnitario = Number(valorUnitarioAttr);
+
+        const impacto = diferencaApurada * valorUnitario;
+
+        impactoEl.textContent =
+        "Impacto (contagem): " + (impacto > 0 ? "+" : "") + formatarMoedaImpressao(impacto);
+
+    }
+
+}
+
+document.addEventListener("input", function(e){
+
+    if(e.target.classList && e.target.classList.contains("input-encontrada")){
+
+        recalcularConferenciaImpressao(e.target.dataset.sku);
+
+    }
+
+});
+
+<\/script>
 
 </body>
 
@@ -2336,13 +2430,7 @@ h1{
 
     janela.document.close();
 
-    setTimeout(()=>{
-
-        janela.focus();
-
-        janela.print();
-
-    },500);
+    janela.focus();
 
 }
 
