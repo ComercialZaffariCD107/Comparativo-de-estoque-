@@ -2779,27 +2779,27 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
     const quatroOuMais =
     dadosBase.filter(x=>x.qtdPulmoes>=4).length;
 
+    // =====================================
+    // IMPACTO FINANCEIRO
+    // =====================================
+
+    const itensComValor =
+    dadosBase.filter(x=>
+        typeof x.valorDivergencia === "number" &&
+        !isNaN(x.valorDivergencia)
+    );
+
+    const itensGanho =
+    itensComValor.filter(x=>x.valorDivergencia > 0);
+
+    const itensPerda =
+    itensComValor.filter(x=>x.valorDivergencia < 0);
+
     const valorGanho =
-    dadosBase
-    .filter(x=>typeof x.valorDivergencia === "number" && !isNaN(x.valorDivergencia) && x.valorDivergencia > 0)
-    .reduce((s,x)=>s + x.valorDivergencia, 0);
+    itensGanho.reduce((s,x)=>s + x.valorDivergencia, 0);
 
     const valorPerda =
-    dadosBase
-    .filter(x=>typeof x.valorDivergencia === "number" && !isNaN(x.valorDivergencia) && x.valorDivergencia < 0)
-    .reduce((s,x)=>s + Math.abs(x.valorDivergencia), 0);
-
-    const valorGanhoFormatado =
-    valorGanho.toLocaleString(
-        "pt-BR",
-        {style:"currency",currency:"BRL"}
-    );
-
-    const valorPerdaFormatado =
-    valorPerda.toLocaleString(
-        "pt-BR",
-        {style:"currency",currency:"BRL"}
-    );
+    itensPerda.reduce((s,x)=>s + Math.abs(x.valorDivergencia), 0);
 
     // impacto total: ganho + perda somados, sem
     // compensar um lado com o outro
@@ -2807,11 +2807,36 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
     const valorAbsoluto =
     valorGanho + valorPerda;
 
-    const valorAbsolutoFormatado =
-    valorAbsoluto.toLocaleString(
-        "pt-BR",
-        {style:"currency",currency:"BRL"}
-    );
+    const valorLiquido =
+    valorGanho - valorPerda;
+
+    const impactoMedioPorItem =
+    itensComValor.length
+    ? valorAbsoluto / itensComValor.length
+    : 0;
+
+    const itensSemValor =
+    total - itensComValor.length;
+
+    const coberturaValores =
+    total
+    ? Math.round((itensComValor.length / total) * 100)
+    : 0;
+
+    function formatarMoeda_(v){
+
+        return (v || 0).toLocaleString(
+            "pt-BR",
+            {style:"currency",currency:"BRL"}
+        );
+
+    }
+
+    const valorGanhoFormatado = formatarMoeda_(valorGanho);
+    const valorPerdaFormatado = formatarMoeda_(valorPerda);
+    const valorAbsolutoFormatado = formatarMoeda_(valorAbsoluto);
+    const valorLiquidoFormatado = formatarMoeda_(valorLiquido);
+    const impactoMedioFormatado = formatarMoeda_(impactoMedioPorItem);
 
     function linha(label, valor, classeExtra){
 
@@ -2823,6 +2848,60 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
         `;
 
     }
+
+    // =====================================
+    // TOP 5 MAIORES IMPACTOS (GANHO E PERDA)
+    // =====================================
+
+    function itemCard(item, tipo){
+
+        const impactoFormatado =
+        formatarMoeda_(item.valorDivergencia);
+
+        const valorUnitarioFormatado =
+        typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario)
+        ? formatarMoeda_(item.valorUnitario)
+        : "—";
+
+        return `
+        <div class="ri-item ${tipo === "ganho" ? "ri-item--ok" : "ri-item--critico"}">
+            <div class="ri-item-topo">
+                <span class="ri-item-sku">#${item.sku} — ${item.descricao || "Sem descrição"}</span>
+                <span class="ri-item-diferenca ${tipo === "ganho" ? "ri-dist-valor--ganho" : "ri-dist-valor--perda"}">${impactoFormatado}</span>
+            </div>
+            <div class="ri-item-linha">
+                <b>Diferença:</b> ${item.diferenca ?? "—"}
+                &nbsp;·&nbsp;
+                <b>Valor Unit.:</b> ${valorUnitarioFormatado}
+                &nbsp;·&nbsp;
+                <b>Pulmões:</b> ${item.qtdPulmoes}
+            </div>
+        </div>
+        `;
+
+    }
+
+    const top5Ganho =
+    itensGanho
+    .slice()
+    .sort((a,b)=>b.valorDivergencia - a.valorDivergencia)
+    .slice(0,5);
+
+    const top5Perda =
+    itensPerda
+    .slice()
+    .sort((a,b)=>a.valorDivergencia - b.valorDivergencia)
+    .slice(0,5);
+
+    const top5GanhoHtml =
+    top5Ganho.length
+    ? top5Ganho.map(item=>itemCard(item,"ganho")).join("")
+    : `<div class="ri-item-linha" style="padding:6px 2px;">Nenhum item com ganho calculado.</div>`;
+
+    const top5PerdaHtml =
+    top5Perda.length
+    ? top5Perda.map(item=>itemCard(item,"perda")).join("")
+    : `<div class="ri-item-linha" style="padding:6px 2px;">Nenhum item com perda calculada.</div>`;
 
     container.innerHTML = `
 
@@ -2867,6 +2946,60 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
     </div>
 
     <div class="ri-secao-titulo">
+        💰 Impacto Financeiro das Divergências
+    </div>
+
+    <div class="ri-kpis">
+
+        <div class="ri-kpi" style="border-left-color:var(--green);">
+            <div class="ri-kpi-label">Valor Ganho</div>
+            <div class="ri-kpi-valor" style="color:var(--green);">${valorGanhoFormatado}</div>
+        </div>
+
+        <div class="ri-kpi" style="border-left-color:var(--red);">
+            <div class="ri-kpi-label">Valor Perda</div>
+            <div class="ri-kpi-valor" style="color:var(--red);">${valorPerdaFormatado}</div>
+        </div>
+
+        <div class="ri-kpi" style="border-left-color:var(--blue);">
+            <div class="ri-kpi-label">Impacto Total (Ganho + Perda)</div>
+            <div class="ri-kpi-valor" style="color:var(--blue);">${valorAbsolutoFormatado}</div>
+        </div>
+
+        <div class="ri-kpi" style="border-left-color:var(--amber);">
+            <div class="ri-kpi-label">Saldo Líquido (Ganho - Perda)</div>
+            <div class="ri-kpi-valor" style="color:${valorLiquido >= 0 ? "var(--green)" : "var(--red)"};">${valorLiquidoFormatado}</div>
+        </div>
+
+    </div>
+
+    <div class="ri-distribuicao" style="margin-bottom:26px;">
+
+        ${linha("Itens com ganho (divergência positiva)", `${itensGanho.length} itens`, "ri-dist-valor--ganho")}
+        ${linha("Itens com perda (divergência negativa)", `${itensPerda.length} itens`, "ri-dist-valor--perda")}
+        ${linha("Impacto médio por item (com valor)", impactoMedioFormatado)}
+        ${linha("Cobertura de valor unitário", `${itensComValor.length} de ${total} itens (${coberturaValores}%)`)}
+        ${itensSemValor > 0 ? linha("⚠️ Itens sem valor unitário cadastrado", `${itensSemValor} itens`, "ri-dist-valor--perda") : ""}
+
+    </div>
+
+    <div class="ri-secao-titulo">
+        📈 Top 5 Maiores Ganhos
+    </div>
+
+    <div style="margin-bottom:26px;">
+        ${top5GanhoHtml}
+    </div>
+
+    <div class="ri-secao-titulo">
+        📉 Top 5 Maiores Perdas
+    </div>
+
+    <div style="margin-bottom:26px;">
+        ${top5PerdaHtml}
+    </div>
+
+    <div class="ri-secao-titulo">
         Distribuição por Nº de Pulmões
     </div>
 
@@ -2878,18 +3011,6 @@ function montarRelatorioImagem(dadosBase = resultado, resumoFiltro = null){
         ${linha("Itens com 4 ou mais pulmões", quatroOuMais)}
         ${linha("Itens sem pulmão", semPulmao)}
         ${linha("Itens sem apanha", semApanha)}
-
-    </div>
-
-    <div class="ri-secao-titulo">
-        Impacto Financeiro das Divergências
-    </div>
-
-    <div class="ri-distribuicao">
-
-        ${linha("Valor Ganho (divergência positiva)", valorGanhoFormatado, "ri-dist-valor--ganho")}
-        ${linha("Valor Perda (divergência negativa)", valorPerdaFormatado, "ri-dist-valor--perda")}
-        ${linha("Impacto Total (ganho + perda)", valorAbsolutoFormatado)}
 
     </div>
 
