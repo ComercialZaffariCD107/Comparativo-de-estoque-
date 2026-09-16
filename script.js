@@ -2216,7 +2216,7 @@ h1{
                             : `<input
                                 type="number"
                                 inputmode="numeric"
-                                placeholder="${unidade}"
+                                placeholder="0"
                                 class="input-encontrada"
                                 data-sku="${item.sku}"
                                 data-sistema="${sistemaComparacao}"
