@@ -1476,6 +1476,284 @@ grid-template-columns:repeat(2,1fr);
 }
 
 /* =======================================================
+   TABELA DE ENDEREÇOS COM CONFERÊNCIA
+   (Apanha + Pulmões + campo de Qtd. Encontrada)
+   -- o valor digitado não é salvo em lugar nenhum,
+   -- serve só pra conferência na tela e sai na impressão
+======================================================= */
+
+.enderecos-tabela{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:6px;
+
+    margin-bottom:4px;
+
+}
+
+.enderecos-cabecalho{
+
+    display:grid;
+
+    grid-template-columns:1.5fr .7fr 1fr .9fr;
+
+    gap:8px;
+
+    padding:0 8px;
+
+    font-size:.62rem;
+
+    font-weight:700;
+
+    text-transform:uppercase;
+
+    letter-spacing:.06em;
+
+    color:var(--text-muted);
+
+}
+
+.enderecos-cabecalho span:nth-child(3),
+.enderecos-cabecalho span:nth-child(4){
+
+    text-align:center;
+
+}
+
+.endereco-linha{
+
+    display:grid;
+
+    grid-template-columns:1.5fr .7fr 1fr .9fr;
+
+    gap:8px;
+
+    align-items:center;
+
+    background:var(--surface-alt);
+
+    border:1px solid var(--border-light);
+
+    border-radius:var(--radius-sm);
+
+    padding:7px 8px;
+
+}
+
+.endereco-linha.linha-apanha{
+
+    background:var(--blue-dim);
+
+    border-color:#b9cdf0;
+
+}
+
+.endereco-linha.linha-vazia{
+
+    background:var(--amber-dim);
+
+    border-color:var(--amber);
+
+}
+
+.endereco-tag{
+
+    font-family:var(--font-mono);
+
+    font-size:.72rem;
+
+    font-weight:700;
+
+    color:var(--navy-deep);
+
+    white-space:nowrap;
+
+    overflow:hidden;
+
+    text-overflow:ellipsis;
+
+}
+
+.endereco-tipo{
+
+    font-size:.62rem;
+
+    font-weight:700;
+
+    text-transform:uppercase;
+
+    letter-spacing:.04em;
+
+    color:var(--text-muted);
+
+}
+
+.endereco-tipo.tipo-apanha{ color:var(--blue); }
+
+.qtd-sistema{
+
+    font-family:var(--font-mono);
+
+    font-size:.78rem;
+
+    font-weight:600;
+
+    color:var(--text);
+
+    text-align:center;
+
+}
+
+.input-encontrada{
+
+    width:100%;
+
+    font-family:var(--font-mono);
+
+    font-size:.82rem;
+
+    font-weight:700;
+
+    text-align:center;
+
+    color:var(--navy-deep);
+
+    background:#fff;
+
+    border:1.5px solid var(--border-light);
+
+    border-radius:var(--radius-sm);
+
+    padding:5px 4px;
+
+    outline:none;
+
+    transition:.15s;
+
+}
+
+.input-encontrada::placeholder{ color:#B7BFD9; font-weight:400; }
+
+.input-encontrada:focus{
+
+    border-color:var(--amber);
+
+    box-shadow:0 0 0 3px var(--amber-dim);
+
+}
+
+.input-encontrada.divergente{
+
+    border-color:var(--red);
+
+    background:var(--red-dim);
+
+}
+
+.input-encontrada.confere{
+
+    border-color:var(--green);
+
+    background:var(--green-dim);
+
+}
+
+.item-card-footer{
+
+    display:grid;
+
+    grid-template-columns:repeat(2, 1fr);
+
+    gap:10px;
+
+    margin-top:2px;
+
+    padding-top:12px;
+
+    border-top:1px solid var(--border);
+
+}
+
+.item-card-footer .footer-bloco{
+
+    background:var(--surface-alt);
+
+    border:1px solid var(--border-light);
+
+    border-radius:var(--radius-sm);
+
+    padding:8px 10px;
+
+}
+
+.item-card-footer .footer-bloco .label{
+
+    font-size:.62rem;
+
+    font-weight:700;
+
+    text-transform:uppercase;
+
+    letter-spacing:.05em;
+
+    color:var(--text-muted);
+
+    margin-bottom:2px;
+
+}
+
+.item-card-footer .footer-bloco .valor{
+
+    font-family:var(--font-mono);
+
+    font-size:.92rem;
+
+    font-weight:700;
+
+    color:var(--text);
+
+}
+
+.item-card-footer .footer-bloco .valor.ganho{ color:var(--green); }
+.item-card-footer .footer-bloco .valor.perda{ color:var(--red); }
+.item-card-footer .footer-bloco .valor.neutro{ color:var(--text-muted); font-size:.78rem; font-weight:600; }
+
+.item-card-footer .footer-bloco.destaque{
+
+    grid-column:1/-1;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    background:var(--navy-deep);
+
+    border:none;
+
+}
+
+.item-card-footer .footer-bloco.destaque .label{ color:#9BB0E0; }
+.item-card-footer .footer-bloco.destaque .valor{ color:#fff; font-size:1rem; }
+
+@media (max-width:480px){
+
+    .enderecos-cabecalho,
+    .endereco-linha{
+
+        grid-template-columns:1.3fr .6fr .8fr .8fr;
+
+    }
+
+    .endereco-tag{ font-size:.66rem; }
+
+}
+
+/* =======================================================
    NAVEGAÇÃO ENTRE FERRAMENTAS
 ======================================================= */
 

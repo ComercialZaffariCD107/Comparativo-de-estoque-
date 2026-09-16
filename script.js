@@ -1242,17 +1242,69 @@ function renderizarCards(dados = resultado){
 
     dados.forEach(item=>{
 
-        const pulmoesHtml =
+        // monta a lista de endereços do item: apanha
+        // primeiro (sem qtd. de sistema fixa), depois
+        // cada pulmão com sua quantidade de sistema.
+        // cada linha ganha um input de "Qtd. Encontrada"
+        // usado na conferência física — não é salvo em
+        // lugar nenhum, só serve pra conferir na tela e
+        // sair na impressão
 
-        item.pulmoes.length
+        const linhasEndereco = [];
 
-        ? item.pulmoes.map(p=>
+        if(item.enderecoApanha){
 
-            `<span class="pulmao-chip">${p.endereco} <b>(${p.quantidade})</b></span>`
+            linhasEndereco.push({
+                endereco: item.enderecoApanha,
+                tipo: "Apanha",
+                qtdSistema: null
+            });
 
-          ).join("")
+        }
 
-        : `<span class="pulmao-chip pulmao-vazio">Sem pulmão</span>`;
+        item.pulmoes.forEach(p=>{
+
+            linhasEndereco.push({
+                endereco: p.endereco,
+                tipo: "Pulmão",
+                qtdSistema: p.quantidade
+            });
+
+        });
+
+        const enderecosHtml =
+
+        linhasEndereco.length
+
+        ? linhasEndereco.map(l=>{
+
+            const semQtd = l.qtdSistema === null || l.qtdSistema === undefined;
+
+            return `
+                <div class="endereco-linha ${l.tipo === "Apanha" ? "linha-apanha" : ""} ${semQtd ? "linha-vazia" : ""}">
+                    <span class="endereco-tag">${l.endereco}</span>
+                    <span class="endereco-tipo ${l.tipo === "Apanha" ? "tipo-apanha" : ""}">${l.tipo}</span>
+                    <span class="qtd-sistema">${semQtd ? "—" : l.qtdSistema}</span>
+                    <input
+                        class="input-encontrada"
+                        type="number"
+                        inputmode="numeric"
+                        placeholder="0"
+                        data-sku="${item.sku}"
+                        data-endereco="${l.endereco}"
+                        data-sistema="${semQtd ? 0 : l.qtdSistema}"
+                    >
+                </div>`;
+
+          }).join("")
+
+        : `<div class="endereco-linha linha-vazia">
+                <span class="endereco-tag">—</span>
+                <span class="endereco-tipo">Sem endereço</span>
+                <span class="qtd-sistema">—</span>
+                <input class="input-encontrada" type="number" inputmode="numeric" placeholder="0"
+                    data-sku="${item.sku}" data-endereco="sem-endereco" data-sistema="0">
+            </div>`;
 
         let diferencaHtml = "";
 
@@ -1314,27 +1366,16 @@ function renderizarCards(dados = resultado){
 
             <div class="item-card-body">
 
-                <div class="item-linha">
+                <div class="enderecos-tabela">
 
-                    <span class="item-label">
-                        📍 Apanha
-                    </span>
-
-                    <span class="item-valor">
-                        ${item.enderecoApanha || "Sem apanha cadastrada"}
-                    </span>
-
-                </div>
-
-                <div class="item-linha">
-
-                    <span class="item-label">
-                        📦 Pulmões (${item.qtdPulmoes})
-                    </span>
-
-                    <div class="pulmoes-lista">
-                        ${pulmoesHtml}
+                    <div class="enderecos-cabecalho">
+                        <span>Endereço</span>
+                        <span>Tipo</span>
+                        <span>Qtd. Sistema</span>
+                        <span>Qtd. Encontrada</span>
                     </div>
+
+                    ${enderecosHtml}
 
                 </div>
 
@@ -1374,6 +1415,22 @@ function renderizarCards(dados = resultado){
                     : ""
                 }
 
+                <div class="item-card-footer">
+
+                    <div class="footer-bloco">
+                        <div class="label">Diferença apurada</div>
+                        <div class="valor neutro" data-diff-sku="${item.sku}">— aguardando contagem</div>
+                    </div>
+
+                    <div class="footer-bloco destaque">
+                        <div>
+                            <div class="label">Impacto (contagem)</div>
+                            <div class="valor" data-impacto-sku="${item.sku}">—</div>
+                        </div>
+                    </div>
+
+                </div>
+
             </div>
 
         </div>
@@ -1384,6 +1441,121 @@ function renderizarCards(dados = resultado){
     container.innerHTML = html;
 
 }
+
+// =====================================
+// CONFERÊNCIA — QTD. ENCONTRADA POR ENDEREÇO
+// (só existe na tela/impressão, não é salva
+// em lugar nenhum — some ao recarregar)
+// =====================================
+
+function recalcularConferencia(sku){
+
+    const item = resultado.find(x=>x.sku === sku);
+
+    if(!item){
+        return;
+    }
+
+    const inputs =
+    document.querySelectorAll(`.input-encontrada[data-sku="${sku}"]`);
+
+    let totalSistema = 0;
+    let totalEncontrado = 0;
+    let algumPreenchido = false;
+
+    inputs.forEach(inp=>{
+
+        const sistema = Number(inp.dataset.sistema) || 0;
+        totalSistema += sistema;
+
+        const valorDigitado = inp.value.trim();
+
+        if(valorDigitado !== ""){
+
+            algumPreenchido = true;
+
+            const encontrado = Number(valorDigitado) || 0;
+            totalEncontrado += encontrado;
+
+            if(encontrado === sistema){
+                inp.classList.remove("divergente");
+                inp.classList.add("confere");
+            }
+            else{
+                inp.classList.remove("confere");
+                inp.classList.add("divergente");
+            }
+
+        }
+        else{
+
+            inp.classList.remove("confere","divergente");
+
+        }
+
+    });
+
+    const diffEl =
+    document.querySelector(`[data-diff-sku="${sku}"]`);
+
+    const impactoEl =
+    document.querySelector(`[data-impacto-sku="${sku}"]`);
+
+    if(!diffEl || !impactoEl){
+        return;
+    }
+
+    if(!algumPreenchido){
+
+        diffEl.textContent = "— aguardando contagem";
+        diffEl.className = "valor neutro";
+        impactoEl.textContent = "—";
+        impactoEl.style.color = "";
+
+        return;
+
+    }
+
+    const diferencaApurada = totalEncontrado - totalSistema;
+
+    const impacto =
+    typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario)
+    ? diferencaApurada * item.valorUnitario
+    : null;
+
+    diffEl.textContent =
+    (diferencaApurada > 0 ? "+" : "") + diferencaApurada + " un.";
+
+    diffEl.className =
+    "valor " + (diferencaApurada > 0 ? "ganho" : diferencaApurada < 0 ? "perda" : "neutro");
+
+    if(impacto === null){
+
+        impactoEl.textContent = "sem valor unit.";
+        impactoEl.style.color = "";
+
+    }
+    else{
+
+        impactoEl.textContent =
+        (impacto > 0 ? "+" : "") + formatarMoeda(impacto);
+
+        impactoEl.style.color =
+        impacto > 0 ? "#8FE0B4" : impacto < 0 ? "#FF9AA2" : "#fff";
+
+    }
+
+}
+
+document.addEventListener("input", (e)=>{
+
+    if(e.target.classList && e.target.classList.contains("input-encontrada")){
+
+        recalcularConferencia(e.target.dataset.sku);
+
+    }
+
+});
 
 // =====================================
 // FILTROS
@@ -1848,25 +2020,99 @@ h1{
 
 }
 
-.pulmoes{
+.enderecos{
 
-    margin-top:3px;
+    width:100%;
+
+    border-collapse:collapse;
+
+    margin-top:4px;
+
+    font-size:11px;
 
 }
 
-.pulmao-item{
+.enderecos th{
 
-    display:inline-block;
+    text-align:left;
 
-    background:#eef2f7;
+    font-size:9px;
 
-    border-radius:5px;
+    text-transform:uppercase;
 
-    padding:2px 6px;
+    letter-spacing:.03em;
 
-    margin:2px 4px 0 0;
+    color:#6b7280;
 
-    font-size:11px;
+    padding:3px 6px;
+
+    border-bottom:1px solid #d9d9d9;
+
+}
+
+.enderecos td{
+
+    padding:3px 6px;
+
+    border-bottom:1px solid #f0f0f0;
+
+}
+
+.enderecos td.tag{
+
+    font-weight:bold;
+
+    color:#1e3a8a;
+
+}
+
+.enderecos tr.apanha td.tag{
+
+    color:#2E63A8;
+
+}
+
+.enderecos td.centro{
+
+    text-align:center;
+
+}
+
+.enderecos td.encontrada{
+
+    text-align:center;
+
+    font-weight:bold;
+
+}
+
+.enderecos tr.confere td.encontrada{
+
+    color:#1E9E5C;
+
+}
+
+.enderecos tr.divergente td.encontrada{
+
+    color:#D9333F;
+
+}
+
+.apuracao{
+
+    margin-top:8px;
+
+    padding-top:6px;
+
+    border-top:1px dashed #d9d9d9;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    font-size:12px;
+
+    font-weight:bold;
 
 }
 
@@ -1914,15 +2160,119 @@ h1{
 
     dados.forEach(item=>{
 
-        const pulmoesHtml =
+        // monta as mesmas linhas de endereço da tela
+        // (apanha + pulmões) e busca no DOM o que foi
+        // digitado em "Qtd. Encontrada" pra cada uma —
+        // esse valor nunca é salvo, só existe na tela
+        // e agora vai junto pra impressão
 
-        item.pulmoes.length
+        const linhasEndereco = [];
 
-        ? item.pulmoes.map(
-            p=>`<span class="pulmao-item">${p.endereco} (${p.quantidade})</span>`
-          ).join("")
+        if(item.enderecoApanha){
 
-        : `<span class="pulmao-item">Sem pulmão</span>`;
+            linhasEndereco.push({
+                endereco: item.enderecoApanha,
+                tipo: "Apanha",
+                qtdSistema: null
+            });
+
+        }
+
+        item.pulmoes.forEach(p=>{
+
+            linhasEndereco.push({
+                endereco: p.endereco,
+                tipo: "Pulmão",
+                qtdSistema: p.quantidade
+            });
+
+        });
+
+        let totalSistema = 0;
+        let totalEncontrado = 0;
+        let algumPreenchido = false;
+
+        const linhasHtml =
+
+        linhasEndereco.length
+
+        ? linhasEndereco.map(l=>{
+
+            const semQtd = l.qtdSistema === null || l.qtdSistema === undefined;
+            const sistema = semQtd ? 0 : l.qtdSistema;
+
+            totalSistema += sistema;
+
+            const inputTela =
+            document.querySelector(
+                `.input-encontrada[data-sku="${item.sku}"][data-endereco="${l.endereco}"]`
+            );
+
+            const valorDigitado =
+            inputTela ? inputTela.value.trim() : "";
+
+            let classeLinha = "";
+
+            let encontradoTexto = "—";
+
+            if(valorDigitado !== ""){
+
+                algumPreenchido = true;
+
+                const encontrado = Number(valorDigitado) || 0;
+                totalEncontrado += encontrado;
+                encontradoTexto = String(encontrado);
+
+                classeLinha +=
+                " " + (encontrado === sistema ? "confere" : "divergente");
+
+            }
+
+            return `
+                <tr class="${l.tipo === "Apanha" ? "apanha" : ""} ${classeLinha}">
+                    <td class="tag">${l.endereco}</td>
+                    <td>${l.tipo}</td>
+                    <td class="centro">${semQtd ? "—" : sistema}</td>
+                    <td class="encontrada">${encontradoTexto}</td>
+                </tr>`;
+
+          }).join("")
+
+        : `<tr><td colspan="4">Sem endereço cadastrado</td></tr>`;
+
+        const enderecosHtml = `
+        <table class="enderecos">
+            <thead>
+                <tr>
+                    <th>Endereço</th>
+                    <th>Tipo</th>
+                    <th class="centro">Qtd. Sistema</th>
+                    <th class="centro">Qtd. Encontrada</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${linhasHtml}
+            </tbody>
+        </table>`;
+
+        let apuracaoHtml = "";
+
+        if(algumPreenchido){
+
+            const diferencaApurada = totalEncontrado - totalSistema;
+
+            const impacto =
+            typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario)
+            ? diferencaApurada * item.valorUnitario
+            : null;
+
+            apuracaoHtml = `
+            <div class="apuracao">
+                <span>Diferença apurada: ${diferencaApurada > 0 ? "+" : ""}${diferencaApurada} un.</span>
+                <span>${impacto === null ? "" : "Impacto (contagem): " + (impacto > 0 ? "+" : "") + formatarMoeda(impacto)}</span>
+            </div>`;
+
+        }
 
         const diferencaHtml =
 
@@ -1950,19 +2300,7 @@ h1{
 
     </div>
 
-    <div class="linha">
-
-        <b>Apanha:</b> ${item.enderecoApanha || "Sem apanha cadastrada"}
-
-    </div>
-
-    <div class="linha">
-
-        <b>Pulmões (${item.qtdPulmoes}):</b>
-
-        <div class="pulmoes">${pulmoesHtml}</div>
-
-    </div>
+    ${enderecosHtml}
 
     ${
         typeof item.valorUnitario === "number" && !isNaN(item.valorUnitario)
@@ -1975,6 +2313,8 @@ h1{
         ? `<div class="linha"><b>${item.valorDivergencia >= 0 ? "Impacto (Ganho):" : "Impacto (Perda):"}</b> ${formatarMoeda(item.valorDivergencia)}</div>`
         : ""
     }
+
+    ${apuracaoHtml}
 
 </div>
 
