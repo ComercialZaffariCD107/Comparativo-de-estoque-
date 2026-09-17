@@ -900,6 +900,14 @@ function gerarComparativo(){
         ? `${posicaoApanha.CODRUA}.${posicaoApanha.NROPREDIO}.${posicaoApanha.NROAPARTAMENTO}.${posicaoApanha.NROSALA}`
         : null;
 
+        // quantidade que o sistema (CD Locus) informa
+        // para o endereço de apanha — mesma origem/coluna
+        // usada nos pulmões (QTD_END). Sem posição de
+        // apanha ou sem essa coluna, fica 0.
+
+        const quantidadeApanha =
+        Number(posicaoApanha?.QTD_END || 0);
+
         const pulmoesBrutos =
         mapaPulmoes[sku] || [];
 
@@ -969,6 +977,8 @@ function gerarComparativo(){
             : null,
 
             enderecoApanha,
+
+            quantidadeApanha,
 
             pavilhao:
             obterPavilhao(posicaoApanha?.CODRUA),
@@ -1966,9 +1976,55 @@ window.addEventListener("load",()=>{
 // IMPRIMIR
 // =====================================
 
+// endereço "principal" do item pra fins de ordenação
+// na impressão de contagem — apanha primeiro, senão o
+// primeiro pulmão cadastrado. Quem não tem endereço
+// nenhum vai pro final da lista.
+
+function enderecoPrincipal(item){
+
+    if(item.enderecoApanha){
+
+        return item.enderecoApanha;
+
+    }
+
+    if(item.pulmoes.length){
+
+        return item.pulmoes[0].endereco;
+
+    }
+
+    return null;
+
+}
+
 function imprimirContagem(){
 
-    const dados = obterFiltrado();
+    // ordem de impressão: por endereço (rua), A - Z —
+    // não pela ordem de SKU/tela. Compara numericamente
+    // cada segmento do endereço (RUA.PREDIO.APTO.SALA)
+    // pra "072" vir antes de "104", por exemplo.
+
+    const dados =
+    obterFiltrado()
+    .slice()
+    .sort((a,b)=>{
+
+        const enderecoA = enderecoPrincipal(a);
+        const enderecoB = enderecoPrincipal(b);
+
+        if(!enderecoA && !enderecoB) return 0;
+        if(!enderecoA) return 1;
+        if(!enderecoB) return -1;
+
+        return enderecoA.localeCompare(
+            enderecoB,
+            "pt-BR",
+            {numeric:true}
+        );
+
+    });
 
     if(!dados.length){
 
@@ -2395,7 +2451,7 @@ h1{
             linhasEndereco.push({
                 endereco: item.enderecoApanha,
                 tipo: "Apanha",
-                qtdSistema: null
+                qtdSistema: Number(item.quantidadeApanha) || 0
             });
 
         }
@@ -2418,25 +2474,27 @@ h1{
 
         ? linhasEndereco.map(l=>{
 
-            const semQtd = l.qtdSistema === null || l.qtdSistema === undefined;
-            const sistemaUn = semQtd ? 0 : l.qtdSistema;
+            // agora todo endereço (apanha ou pulmão) sempre
+            // tem uma quantidade de sistema numérica — sem
+            // dado no arquivo de posições vira 0, nunca "—"
+
+            const sistemaUn = Number(l.qtdSistema) || 0;
 
             // só mostra em CX quando o item realmente é
             // paletizado em caixa (embalagem > 1) e a
             // quantidade do endereço divide certinho por
-            // caixa. Caixa quebrada/fracionada ou item que
-            // é contado por unidade continua em UN.
+            // caixa. Caixa quebrada/fracionada, quantidade
+            // zerada ou item contado por unidade continua em UN.
 
             const podeConverterCx =
-            !semQtd && embalagemItem > 1 && sistemaUn % embalagemItem === 0;
+            embalagemItem > 1 && sistemaUn > 0 && sistemaUn % embalagemItem === 0;
 
-            const unidade = semQtd ? "" : (podeConverterCx ? "CX" : "UN");
+            const unidade = podeConverterCx ? "CX" : "UN";
 
             const sistemaComparacao =
-            semQtd ? 0 : (podeConverterCx ? sistemaUn / embalagemItem : sistemaUn);
+            podeConverterCx ? sistemaUn / embalagemItem : sistemaUn;
 
-            const sistemaTexto =
-            semQtd ? "—" : `${sistemaComparacao} ${unidade}`;
+            const sistemaTexto = `${sistemaComparacao} ${unidade}`;
 
             return `
                 <tr class="${l.tipo === "Apanha" ? "apanha" : ""}" data-linha-sku="${item.sku}">
@@ -2454,7 +2512,7 @@ h1{
                             data-sistema-un="${sistemaUn}"
                             data-unidade="${unidade}"
                             data-embalagem="${embalagemItem}"
-                            data-sem-sistema="${semQtd ? "true" : "false"}"
+                            data-sem-sistema="false"
                         >
                     </td>
                 </tr>`;
