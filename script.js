@@ -8,6 +8,74 @@ let dadosValores = [];
 let resultado = [];
 
 // =====================================
+// ALTERNÂNCIA DE VIEWS (abas internas)
+// — mesmo HTML/console, múltiplos
+// relatórios. Hoje: Comparativo de
+// Estoque e Inventário Cíclico. Feito
+// pra crescer: qualquer nova view só
+// precisa de um botão [data-view] na
+// nav e uma <div id="view-NOME">.
+// =====================================
+
+const VIEW_STORAGE_KEY = "cd107-comparativo-view-ativa";
+
+function trocarView(view){
+
+    document
+    .querySelectorAll(".view-secao")
+    .forEach(secao=>{
+
+        secao.style.display =
+        (secao.id === `view-${view}`)
+        ? "block"
+        : "none";
+
+    });
+
+    document
+    .querySelectorAll(".nav-view-btn")
+    .forEach(btn=>{
+
+        btn.classList.toggle(
+            "ativo",
+            btn.dataset.view === view
+        );
+
+    });
+
+    try{
+        localStorage.setItem(VIEW_STORAGE_KEY, view);
+    }
+    catch(erro){
+        // localStorage indisponível (modo privado etc.) — sem problema, só não persiste
+    }
+
+}
+
+(function inicializarViewAtiva(){
+
+    let viewSalva = "comparativo";
+
+    try{
+
+        viewSalva =
+        localStorage.getItem(VIEW_STORAGE_KEY) ||
+        "comparativo";
+
+    }
+    catch(erro){
+        // ignora
+    }
+
+    if(document.getElementById(`view-${viewSalva}`)){
+
+        trocarView(viewSalva);
+
+    }
+
+})();
+
+// =====================================
 // CONFIGURAÇÃO DE PAVILHÕES
 // =====================================
 // Mesma referência oficial usada no Gerador de Abastecimento PCP

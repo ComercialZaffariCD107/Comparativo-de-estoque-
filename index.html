@@ -12,7 +12,7 @@
         Comparativo de Estoque CD x Comercial
     </title>
 
-    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="stylesheet" href="style.css?v=11">
 
     <!-- Papa Parse -->
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -47,11 +47,29 @@
                 🚚 Gerador de Abastecimento
             </a>
 
-            <a href="https://comercialzaffaricd107.github.io/Comparativo-de-estoque-/" class="ativo">
+            <button
+                type="button"
+                class="nav-view-btn ativo"
+                data-view="comparativo"
+                onclick="trocarView('comparativo')">
                 📊 Comparativo de Estoque
-            </a>
+            </button>
+
+            <button
+                type="button"
+                class="nav-view-btn"
+                data-view="inventario"
+                onclick="trocarView('inventario')">
+                🔄 Inventário Cíclico
+            </button>
 
         </nav>
+
+        <!-- ===================================== -->
+        <!-- VIEW: COMPARATIVO DE ESTOQUE -->
+        <!-- ===================================== -->
+
+        <div id="view-comparativo" class="view-secao">
 
         <!-- ===================================== -->
         <!-- UPLOADS -->
@@ -577,6 +595,226 @@
 
         </div>
 
+        </div>
+        <!-- /view-comparativo -->
+
+        <!-- ===================================== -->
+        <!-- VIEW: INVENTÁRIO CÍCLICO -->
+        <!-- ===================================== -->
+
+        <div id="view-inventario" class="view-secao" style="display:none;">
+
+            <!-- ARQUIVOS -->
+
+            <div class="card">
+
+                <h2>
+                    Arquivos do Inventário Cíclico
+                </h2>
+
+                <div class="upload-area">
+
+                    <div class="upload-box">
+
+                        <label>
+                            📗 Estoque Pulmão
+                        </label>
+
+                        <label
+                            class="upload-btn"
+                            for="icArquivoPulmao">
+
+                            Selecionar Arquivo
+
+                        </label>
+
+                        <input
+                            type="file"
+                            id="icArquivoPulmao"
+                            accept=".txt,.csv">
+
+                        <div
+                            class="upload-nome"
+                            id="icNomePulmao">
+
+                            Nenhum arquivo selecionado
+
+                        </div>
+
+                    </div>
+
+                    <div class="upload-box">
+
+                        <label>
+                            🛣️ Ruas Fixas (Picking)
+                        </label>
+
+                        <label
+                            class="upload-btn"
+                            for="icArquivoRuasFixas">
+
+                            Selecionar Arquivo
+
+                        </label>
+
+                        <input
+                            type="file"
+                            id="icArquivoRuasFixas"
+                            accept=".txt,.csv">
+
+                        <div
+                            class="upload-nome"
+                            id="icNomeRuasFixas">
+
+                            Nenhum arquivo selecionado
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <br>
+
+                <div class="acoes">
+
+                    <button
+                        class="btn-processar"
+                        onclick="icProcessar()">
+
+                        🚀 Processar Inventário
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <!-- FILTRO DE RUA -->
+
+            <div class="card">
+
+                <h2>
+                    Filtro de Rua
+                </h2>
+
+                <p class="aviso-inventario">
+                    Selecione a(s) rua(s) para puxar os endereços de picking e de pulmão correspondentes.
+                </p>
+
+                <div class="filtros">
+
+                    <div class="filtro-pavilhao-multi" id="icFiltroRuaMulti">
+
+                        <button
+                            type="button"
+                            class="filtro-pavilhao-btn"
+                            id="icFiltroRuaBtn"
+                            onclick="icToggleRuaDropdown()">
+
+                            <span id="icFiltroRuaLabel">Processe os arquivos primeiro</span>
+                            <span class="filtro-pavilhao-seta">▾</span>
+
+                        </button>
+
+                        <div
+                            class="filtro-pavilhao-opcoes filtro-rua-opcoes"
+                            id="icFiltroRuaOpcoes"
+                            style="display:none;">
+
+                            <p class="ic-aviso-vazio" id="icAvisoRuaVazia">
+                                Processe os arquivos para listar as ruas disponíveis.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="kpis" style="margin-top:20px;">
+
+                    <div class="kpi-card">
+                        <h3>Endereços de Picking</h3>
+                        <span id="icKpiPickings">0</span>
+                    </div>
+
+                    <div class="kpi-card">
+                        <h3>Endereços de Pulmão</h3>
+                        <span id="icKpiPulmoesTotal">0</span>
+                    </div>
+
+                    <div class="kpi-card">
+                        <h3>Pulmões Ocupados</h3>
+                        <span id="icKpiPulmoesOcupados">0</span>
+                    </div>
+
+                    <div class="kpi-card">
+                        <h3>Pulmões Disponíveis</h3>
+                        <span id="icKpiPulmoesDisponiveis">0</span>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- IMPRESSÃO -->
+
+            <div class="card">
+
+                <h2>
+                    Impressão do Inventário
+                </h2>
+
+                <p class="aviso-inventario">
+                    Gera uma folha de contagem em branco (endereço + produto do sistema) para a(s) rua(s) selecionada(s) acima — de um lado o picking, de outro os pulmões.
+                </p>
+
+                <div class="relatorio-grupos">
+
+                    <div class="relatorio-grupo">
+
+                        <span class="relatorio-grupo-titulo">📋 Picking (Apanha)</span>
+
+                        <div class="acoes acoes-relatorio">
+
+                            <button
+                                class="btn-exportar"
+                                onclick="icImprimirPickings()">
+
+                                🖨️ Imprimir Picking
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                    <div class="relatorio-grupo">
+
+                        <span class="relatorio-grupo-titulo">📦 Pulmão</span>
+
+                        <div class="acoes acoes-relatorio">
+
+                            <button
+                                class="btn-exportar-financeiro"
+                                onclick="icImprimirPulmoes()">
+
+                                🖨️ Imprimir Pulmões
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+        <!-- /view-inventario -->
+
     </div>
 
     <!-- ===================================== -->
@@ -602,7 +840,8 @@
 
     </div>
 
-<script src="script.js?v=8"></script>
+<script src="script.js?v=9"></script>
+<script src="inventario.js?v=1"></script>
 <script src="sync.js?v=2"></script>
 
 </body>

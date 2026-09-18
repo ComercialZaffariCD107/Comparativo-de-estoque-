@@ -1839,6 +1839,96 @@ grid-template-columns:repeat(2,1fr);
 
 }
 
+/* botões de alternância de view (mesmo tool,
+   mesmo html — abas internas como Inventário
+   Cíclico dentro do Comparativo de Estoque) */
+
+.nav-ferramentas button.nav-view-btn{
+
+    display:inline-block;
+
+    padding:10px 20px;
+
+    border-radius:var(--radius-sm);
+
+    border:1px solid var(--border-light);
+
+    background:var(--surface-alt);
+
+    color:var(--text-muted);
+
+    font-size:.8rem;
+
+    font-weight:700;
+
+    letter-spacing:.05em;
+
+    text-transform:uppercase;
+
+    font-family:var(--font-body);
+
+    cursor:pointer;
+
+    transition:.2s;
+}
+
+.nav-ferramentas button.nav-view-btn:hover{
+
+    border-color:var(--blue);
+
+    color:var(--blue);
+
+    transform:translateY(-2px);
+
+    filter:none;
+}
+
+.nav-ferramentas button.nav-view-btn.ativo{
+
+    border-color:var(--amber);
+
+    color:var(--amber);
+
+    background:var(--amber-dim);
+}
+
+/* =========================
+INVENTÁRIO CÍCLICO
+========================= */
+
+.aviso-inventario{
+
+    font-size:.85rem;
+
+    color:var(--text-muted);
+
+    margin:-6px 0 18px 0;
+}
+
+.ic-aviso-vazio{
+
+    padding:10px 8px;
+
+    font-size:.8rem;
+
+    color:var(--text-muted);
+}
+
+.filtro-rua-grupo-titulo-ic{
+
+    padding:8px 8px 4px;
+
+    font-size:11px;
+
+    font-weight:700;
+
+    letter-spacing:.04em;
+
+    text-transform:uppercase;
+
+    color:var(--text-muted);
+}
+
 /* =======================================================
    BOTÃO WHATSAPP
 ======================================================= */
