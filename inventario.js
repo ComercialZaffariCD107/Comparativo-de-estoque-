@@ -531,15 +531,45 @@ function icObterRuasFiltroAtual(){
 // ordenados por endereço (rua.predio.apto.sala)
 // =====================================
 
+// Ordem: rua → lado (ÍMPARES primeiro, depois PARES)
+// → prédio → apto → sala. O lado é definido pelo número
+// do prédio (ex.: 115 = ímpar, 116 = par). Vale para
+// Picking e Pulmão (os dois usam este comparador).
+function icNumeroOuNaN(valor){
+
+    const n = parseInt(String(valor).trim(), 10);
+
+    return n;
+
+}
+
 function icCompararEndereco(a, b){
 
-    const enderecoA = `${a.rua}.${a.predio}.${a.apto}.${a.sala}`;
-    const enderecoB = `${b.rua}.${b.predio}.${b.apto}.${b.sala}`;
-
-    return enderecoA.localeCompare(
-        enderecoB,
+    // 1) Rua
+    const cmpRua = String(a.rua).localeCompare(
+        String(b.rua),
         "pt-BR",
         {numeric:true}
+    );
+
+    if(cmpRua !== 0) return cmpRua;
+
+    // 2) Lado: ímpar (0) antes de par (1)
+    const predioA = icNumeroOuNaN(a.predio);
+    const predioB = icNumeroOuNaN(b.predio);
+
+    const ladoA = (!isNaN(predioA) && predioA % 2 === 0) ? 1 : 0;
+    const ladoB = (!isNaN(predioB) && predioB % 2 === 0) ? 1 : 0;
+
+    if(ladoA !== ladoB) return ladoA - ladoB;
+
+    // 3) Prédio → apto → sala (ordem natural crescente)
+    const opcoes = {numeric:true};
+
+    return (
+        String(a.predio).localeCompare(String(b.predio), "pt-BR", opcoes) ||
+        String(a.apto).localeCompare(String(b.apto), "pt-BR", opcoes) ||
+        String(a.sala).localeCompare(String(b.sala), "pt-BR", opcoes)
     );
 
 }
