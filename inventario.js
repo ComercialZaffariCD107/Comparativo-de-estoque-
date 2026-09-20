@@ -574,6 +574,52 @@ function icCompararEndereco(a, b){
 
 }
 
+// Ordem do PULMÃO: rua → lado (ÍMPARES primeiro, depois PARES)
+// → ALTURA (dezena do apto: 21/22 = 2, 31/32 = 3, 41/42 = 4...)
+// → prédio → apto → sala.
+// Ou seja, percorre todos os prédios do lado ímpar na altura 21/22
+// (117.21, 117.22, 119.21, 119.22, 121.21...) e só depois sobe
+// para a altura 31/32, e assim por diante.
+function icCompararEnderecoPulmao(a, b){
+
+    // 1) Rua
+    const cmpRua = String(a.rua).localeCompare(
+        String(b.rua),
+        "pt-BR",
+        {numeric:true}
+    );
+
+    if(cmpRua !== 0) return cmpRua;
+
+    // 2) Lado: ímpar (0) antes de par (1)
+    const predioA = icNumeroOuNaN(a.predio);
+    const predioB = icNumeroOuNaN(b.predio);
+
+    const ladoA = (!isNaN(predioA) && predioA % 2 === 0) ? 1 : 0;
+    const ladoB = (!isNaN(predioB) && predioB % 2 === 0) ? 1 : 0;
+
+    if(ladoA !== ladoB) return ladoA - ladoB;
+
+    // 3) Altura = dezena do apto (21/22 → 2, 31/32 → 3...)
+    const aptoA = icNumeroOuNaN(a.apto);
+    const aptoB = icNumeroOuNaN(b.apto);
+
+    const alturaA = isNaN(aptoA) ? -1 : Math.floor(aptoA / 10);
+    const alturaB = isNaN(aptoB) ? -1 : Math.floor(aptoB / 10);
+
+    if(alturaA !== alturaB) return alturaA - alturaB;
+
+    // 4) Prédio → apto → sala (ordem natural crescente)
+    const opcoes = {numeric:true};
+
+    return (
+        String(a.predio).localeCompare(String(b.predio), "pt-BR", opcoes) ||
+        String(a.apto).localeCompare(String(b.apto), "pt-BR", opcoes) ||
+        String(a.sala).localeCompare(String(b.sala), "pt-BR", opcoes)
+    );
+
+}
+
 function icFiltrarPickings(){
 
     const ruasFiltro = icObterRuasFiltroAtual();
@@ -598,7 +644,7 @@ function icFiltrarPulmoes(){
         ruasFiltro.includes(l.rua)
     )
     .slice()
-    .sort(icCompararEndereco);
+    .sort(icCompararEnderecoPulmao);
 
 }
 
