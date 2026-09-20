@@ -194,7 +194,22 @@ function icNormalizarPulmao(linhas){
         status: String(colStatus ? (l[colStatus] ?? "") : "").trim()
 
     }))
-    .filter(l=> l.rua !== "");
+    .filter(l=> l.rua !== "")
+    // Endereços com status INATIVO não entram no inventário
+    // (não aparecem na lista de ruas, KPIs nem na impressão)
+    .filter(l=> !icStatusEhInativo(l.status));
+
+}
+
+// Aceita "Inativo", "INATIVO", "Inativa", " inativo " etc.
+function icStatusEhInativo(status){
+
+    return String(status ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .startsWith("inativ");
 
 }
 
