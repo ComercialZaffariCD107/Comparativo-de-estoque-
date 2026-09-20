@@ -574,12 +574,11 @@ function icCompararEndereco(a, b){
 
 }
 
-// Ordem do PULMÃO: rua → lado (ÍMPARES primeiro, depois PARES)
-// → ALTURA (dezena do apto: 21/22 = 2, 31/32 = 3, 41/42 = 4...)
-// → prédio → apto → sala.
-// Ou seja, percorre todos os prédios do lado ímpar na altura 21/22
-// (117.21, 117.22, 119.21, 119.22, 121.21...) e só depois sobe
-// para a altura 31/32, e assim por diante.
+// Ordem do PULMÃO: rua → ALTURA (crescente) → lado (ÍMPARES
+// primeiro, depois PARES) → prédio → apto → sala.
+// Altura = dezena do apto (21/22 = 2, 31/32 = 3, 41/42 = 4...).
+// Ou seja, termina a altura 21/22 inteira (ímpares e depois pares)
+// antes de passar para a altura 31/32, e assim por diante.
 function icCompararEnderecoPulmao(a, b){
 
     // 1) Rua
@@ -591,7 +590,17 @@ function icCompararEnderecoPulmao(a, b){
 
     if(cmpRua !== 0) return cmpRua;
 
-    // 2) Lado: ímpar (0) antes de par (1)
+    // 2) Altura = dezena do apto, em ordem crescente
+    //    (apto sem número vai para o fim)
+    const aptoA = icNumeroOuNaN(a.apto);
+    const aptoB = icNumeroOuNaN(b.apto);
+
+    const alturaA = isNaN(aptoA) ? Infinity : Math.floor(aptoA / 10);
+    const alturaB = isNaN(aptoB) ? Infinity : Math.floor(aptoB / 10);
+
+    if(alturaA !== alturaB) return alturaA < alturaB ? -1 : 1;
+
+    // 3) Lado: ímpar (0) antes de par (1)
     const predioA = icNumeroOuNaN(a.predio);
     const predioB = icNumeroOuNaN(b.predio);
 
@@ -599,15 +608,6 @@ function icCompararEnderecoPulmao(a, b){
     const ladoB = (!isNaN(predioB) && predioB % 2 === 0) ? 1 : 0;
 
     if(ladoA !== ladoB) return ladoA - ladoB;
-
-    // 3) Altura = dezena do apto (21/22 → 2, 31/32 → 3...)
-    const aptoA = icNumeroOuNaN(a.apto);
-    const aptoB = icNumeroOuNaN(b.apto);
-
-    const alturaA = isNaN(aptoA) ? -1 : Math.floor(aptoA / 10);
-    const alturaB = isNaN(aptoB) ? -1 : Math.floor(aptoB / 10);
-
-    if(alturaA !== alturaB) return alturaA - alturaB;
 
     // 4) Prédio → apto → sala (ordem natural crescente)
     const opcoes = {numeric:true};
