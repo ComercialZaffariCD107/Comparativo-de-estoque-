@@ -574,11 +574,11 @@ function icCompararEndereco(a, b){
 
 }
 
-// Ordem do PULMÃO: rua → ALTURA (crescente) → lado (ÍMPARES
-// primeiro, depois PARES) → prédio → apto → sala.
+// Ordem do PULMÃO: rua → LADO (todo o lado ÍMPAR primeiro, depois
+// todo o lado PAR) → ALTURA (crescente) → prédio → apto → sala.
 // Altura = dezena do apto (21/22 = 2, 31/32 = 3, 41/42 = 4...).
-// Ou seja, termina a altura 21/22 inteira (ímpares e depois pares)
-// antes de passar para a altura 31/32, e assim por diante.
+// Em cada lado, termina a altura 21/22 em todos os prédios antes de
+// subir para a 31/32, e assim por diante.
 function icCompararEnderecoPulmao(a, b){
 
     // 1) Rua
@@ -590,7 +590,16 @@ function icCompararEnderecoPulmao(a, b){
 
     if(cmpRua !== 0) return cmpRua;
 
-    // 2) Altura = dezena do apto, em ordem crescente
+    // 2) Lado: ímpar (0) antes de par (1)
+    const predioA = icNumeroOuNaN(a.predio);
+    const predioB = icNumeroOuNaN(b.predio);
+
+    const ladoA = (!isNaN(predioA) && predioA % 2 === 0) ? 1 : 0;
+    const ladoB = (!isNaN(predioB) && predioB % 2 === 0) ? 1 : 0;
+
+    if(ladoA !== ladoB) return ladoA - ladoB;
+
+    // 3) Altura = dezena do apto, em ordem crescente
     //    (apto sem número vai para o fim)
     const aptoA = icNumeroOuNaN(a.apto);
     const aptoB = icNumeroOuNaN(b.apto);
@@ -599,15 +608,6 @@ function icCompararEnderecoPulmao(a, b){
     const alturaB = isNaN(aptoB) ? Infinity : Math.floor(aptoB / 10);
 
     if(alturaA !== alturaB) return alturaA < alturaB ? -1 : 1;
-
-    // 3) Lado: ímpar (0) antes de par (1)
-    const predioA = icNumeroOuNaN(a.predio);
-    const predioB = icNumeroOuNaN(b.predio);
-
-    const ladoA = (!isNaN(predioA) && predioA % 2 === 0) ? 1 : 0;
-    const ladoB = (!isNaN(predioB) && predioB % 2 === 0) ? 1 : 0;
-
-    if(ladoA !== ladoB) return ladoA - ladoB;
 
     // 4) Prédio → apto → sala (ordem natural crescente)
     const opcoes = {numeric:true};
