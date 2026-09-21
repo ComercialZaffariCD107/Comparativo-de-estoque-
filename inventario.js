@@ -30,6 +30,19 @@ let icDadosPulmao = [];
 let icDadosRuasFixas = [];
 let icRuasDisponiveis = []; // [{codigo:"105", pavilhao:"Pavilhão 2"}, ...]
 
+// Mapa SKU -> { dun:[{cod,qtd}], ean:[{cod,qtd}] } (opcional).
+// Vem do TXT "Dun e Ean" (SEQPRODUTO;DESCCOMPLETA;QTDEMBALAGEM;
+// CODIGO_BARRAS;TIPO_CODIGO). null = arquivo não carregado, e a
+// folha de contagem sai sem as colunas DUN/EAN.
+let icMapaDunEan = null;
+
+// chave comparável entre arquivos (sem espaços e sem zeros à esquerda)
+function icChaveSku(valor){
+
+    return String(valor ?? "").trim().replace(/^0+(?=\d)/, "");
+
+}
+
 // =====================================
 // NOME DOS ARQUIVOS SELECIONADOS
 // =====================================
@@ -61,6 +74,21 @@ document
     arquivo
     ? arquivo.name
     : "Nenhum arquivo selecionado";
+
+});
+
+document
+.getElementById("icArquivoDunEan")
+?.addEventListener("change", function(){
+
+    const arquivo = this.files[0];
+
+    document
+    .getElementById("icNomeDunEan")
+    .innerText =
+    arquivo
+    ? arquivo.name
+    : "Nenhum arquivo selecionado (opcional)";
 
 });
 
@@ -99,6 +127,34 @@ async function icProcessar(){
 
         icDadosPulmao = icNormalizarPulmao(brutoPulmao);
         icDadosRuasFixas = icNormalizarRuasFixas(brutoRuasFixas);
+
+        // DUN / EAN é opcional: sem o arquivo a folha sai como antes
+        const arquivoDunEan =
+        document
+        .getElementById("icArquivoDunEan")
+        ?.files[0];
+
+        if(arquivoDunEan){
+
+            icMapaDunEan =
+            icNormalizarDunEan(await lerTXT(arquivoDunEan));
+
+            const nomeDunEan =
+            document.getElementById("icNomeDunEan");
+
+            if(nomeDunEan && icMapaDunEan){
+
+                nomeDunEan.innerText =
+                `${arquivoDunEan.name} · ${icMapaDunEan.size.toLocaleString("pt-BR")} SKUs`;
+
+            }
+
+        }
+        else{
+
+            icMapaDunEan = null;
+
+        }
 
         console.log(
             "Inventário Cíclico — Estoque Pulmão:",
@@ -267,6 +323,118 @@ function icNormalizarRuasFixas(linhas){
 
     })
     .filter(l=> l.rua !== "");
+
+}
+
+// =====================================
+// DUN / EAN
+// Cada linha do TXT é UM código de barras de um SKU:
+// TIPO_CODIGO = DUN (caixa) ou EAN (unidade), com
+// QTDEMBALAGEM (unidades que o código representa).
+// Um SKU pode ter vários de cada tipo.
+// =====================================
+
+function icNormalizarDunEan(linhas){
+
+    if(!linhas.length) return null;
+
+    const colSeq =
+    detectarColuna(linhas[0], ["seqproduto","codigo","código","sku"]);
+
+    const colBarras =
+    detectarColuna(linhas[0], ["codigo_barras","codigobarras","codbarras","codigo barras","código de barras"]);
+
+    const colTipo =
+    detectarColuna(linhas[0], ["tipo_codigo","tipocodigo","tipo"]);
+
+    const colQtd =
+    detectarColuna(linhas[0], ["qtdembalagem","qtd_embalagem","embalagem"]);
+
+    if(!colSeq || !colBarras || !colTipo){
+
+        alert(
+            "Não consegui identificar as colunas do arquivo DUN / EAN (SEQPRODUTO, CODIGO_BARRAS, TIPO_CODIGO). Abra o console (F12) e confira as colunas."
+        );
+
+        console.log("Colunas DUN/EAN:", Object.keys(linhas[0]));
+
+        return null;
+
+    }
+
+    const mapa = new Map();
+
+    linhas.forEach(l=>{
+
+        const sku = icChaveSku(l[colSeq]);
+        const cod = String(l[colBarras] ?? "").trim();
+        const tipo = String(l[colTipo] ?? "").trim().toUpperCase();
+
+        if(!sku || !cod) return;
+
+        if(tipo !== "DUN" && tipo !== "EAN") return;
+
+        let reg = mapa.get(sku);
+
+        if(!reg){
+
+            reg = { dun: [], ean: [] };
+            mapa.set(sku, reg);
+
+        }
+
+        reg[tipo === "DUN" ? "dun" : "ean"].push({
+            cod,
+            qtd: colQtd ? (Number(String(l[colQtd] ?? "").replace(",", ".")) || 1) : 1
+        });
+
+    });
+
+    // menor embalagem primeiro (EAN de unidade antes do EAN de caixa)
+    mapa.forEach(reg=>{
+
+        reg.dun.sort((a,b)=> a.qtd - b.qtd);
+        reg.ean.sort((a,b)=> a.qtd - b.qtd);
+
+    });
+
+    console.log("Inventário Cíclico — DUN/EAN:", mapa.size, "SKUs");
+
+    return mapa;
+
+}
+
+// até 2 códigos por célula; o resto vira "+N".
+// DUN sempre mostra o ×qtd (unidades por caixa);
+// EAN só mostra ×qtd quando não é de 1 unidade.
+
+const IC_MAX_CODIGOS_CELULA = 2;
+
+function icCelulaCodigos(sku, tipo){
+
+    const reg = icMapaDunEan?.get(icChaveSku(sku));
+
+    const lista = reg ? reg[tipo] : [];
+
+    if(!lista || !lista.length){
+
+        return `<td class="centro cb-vazio">—</td>`;
+
+    }
+
+    const mostrados = lista.slice(0, IC_MAX_CODIGOS_CELULA);
+
+    const resto = lista.length - mostrados.length;
+
+    const linhas = mostrados.map(c=>{
+
+        const mostrarQtd = tipo === "dun" || c.qtd > 1;
+
+        return `<div class="cb">${c.cod}${mostrarQtd ? `<span class="cb-qtd"> ×${c.qtd}</span>` : ""}</div>`;
+
+    }).join("");
+
+    return `<td class="centro cb-cel">${linhas}${resto > 0 ? `<div class="cb-mais">+${resto}</div>` : ""}</td>`;
 
 }
 
@@ -760,7 +928,7 @@ function icImprimirPickings(){
 
             linhasHtml += `
             <tr class="grupo-rua">
-                <td colspan="4">Rua ${item.rua}</td>
+                <td colspan="${icMapaDunEan ? 6 : 4}">Rua ${item.rua}</td>
             </tr>
             `;
 
@@ -770,6 +938,7 @@ function icImprimirPickings(){
         <tr>
             <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}</td>
             <td class="centro">${item.sku || "—"}</td>
+            ${icMapaDunEan ? icCelulaCodigos(item.sku, "dun") + icCelulaCodigos(item.sku, "ean") : ""}
             <td>${item.descricao || "—"}</td>
             <td class="qtd"><input type="text" class="input-contagem"></td>
         </tr>
@@ -788,6 +957,7 @@ function icImprimirPickings(){
         cabecalhoColunas: `
         <th>Endereço</th>
         <th class="centro">SKU</th>
+        ${icMapaDunEan ? `<th class="centro">DUN</th><th class="centro">EAN</th>` : ""}
         <th>Descrição</th>
         <th class="centro">Qtd. Contada</th>
         `,
@@ -846,7 +1016,7 @@ function icImprimirPulmoes(){
 
             linhasHtml += `
             <tr class="grupo-rua">
-                <td colspan="5">Rua ${item.rua}</td>
+                <td colspan="${icMapaDunEan ? 7 : 5}">Rua ${item.rua}</td>
             </tr>
             `;
 
@@ -860,6 +1030,7 @@ function icImprimirPulmoes(){
             <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}</td>
             <td class="centro"><span class="status-pill ${statusClasse}">${item.status || "—"}</span></td>
             <td class="centro">${item.sku || "—"}</td>
+            ${icMapaDunEan ? icCelulaCodigos(item.sku, "dun") + icCelulaCodigos(item.sku, "ean") : ""}
             <td>${item.descricao || "—"}</td>
             <td class="qtd"><input type="text" class="input-contagem"></td>
         </tr>
@@ -879,6 +1050,7 @@ function icImprimirPulmoes(){
         <th>Endereço</th>
         <th class="centro">Status</th>
         <th class="centro">SKU</th>
+        ${icMapaDunEan ? `<th class="centro">DUN</th><th class="centro">EAN</th>` : ""}
         <th>Descrição</th>
         <th class="centro">Qtd. Contada</th>
         `,
@@ -1028,6 +1200,39 @@ table.itens tr.grupo-rua td{
 
 table.itens tr.grupo-rua:first-child td{
     border-top:none;
+}
+
+td.cb-cel,
+td.cb-vazio{
+    padding-left:3px;
+    padding-right:3px;
+    white-space:nowrap;
+}
+
+td.cb-vazio{
+    color:#9ca3af;
+}
+
+.cb{
+    font-family:Consolas,"Courier New",monospace;
+    font-size:9.5px;
+    line-height:1.35;
+    letter-spacing:-.01em;
+}
+
+.cb-qtd{
+    font-family:Arial,Helvetica,sans-serif;
+    font-size:8px;
+    color:#6b7280;
+}
+
+.cb-mais{
+    font-size:8px;
+    color:#6b7280;
+}
+
+table.itens th.centro{
+    text-align:center;
 }
 
 td.qtd{
