@@ -964,9 +964,13 @@ h2.subtitulo{
 .assinatura{
     display:flex;
     justify-content:space-between;
-    gap:40px;
+    gap:28px;
     margin:16px 0 14px;
     font-size:12px;
+}
+
+.assinatura div.lote{
+    flex:.7;
 }
 
 .assinatura div{
@@ -1122,6 +1126,7 @@ td.qtd{
 </div>
 
 <div class="assinatura">
+    <div class="lote">Lote</div>
     <div>Conferente</div>
     <div>Visto Liderança</div>
 </div>
