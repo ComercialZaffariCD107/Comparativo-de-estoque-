@@ -2588,3 +2588,25 @@ INVENTÁRIO CÍCLICO — FORMA DE ABASTECIMENTO
 
     border:1px solid var(--blue);
 }
+
+.ic-abast-outro{
+
+    background:var(--surface-alt);
+
+    color:var(--text-muted);
+
+    border:1px solid var(--border-light);
+}
+
+/* etiqueta dentro da descrição (cards e relatório imagem) */
+.item-descricao .ic-abast-tag,
+.ri-item-sku .ic-abast-tag{
+
+    font-size:.68rem;
+
+    padding:2px 8px;
+
+    margin-right:6px;
+
+    vertical-align:1px;
+}

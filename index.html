@@ -12,7 +12,7 @@
         Comparativo de Estoque CD x Comercial
     </title>
 
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=13">
 
     <!-- Papa Parse -->
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -172,6 +172,42 @@
 
                         Nenhum arquivo selecionado
 
+                    </div>
+
+                </div>
+
+                <!-- FORMA DE ABASTECIMENTO -->
+
+                <div class="upload-box">
+
+                    <label>
+                        🔁 Forma de Abastecimento (opcional)
+                    </label>
+
+                    <label
+                        class="upload-btn"
+                        for="arquivoFormaAbast">
+
+                        Selecionar Arquivo
+
+                    </label>
+
+                    <input
+                        type="file"
+                        id="arquivoFormaAbast"
+                        accept=".txt,.csv">
+
+                    <div
+                        class="upload-nome"
+                        id="nomeFormaAbast">
+
+                        Nenhum arquivo selecionado (opcional)
+
+                    </div>
+
+                    <div class="ic-legenda-abast">
+                        <span class="ic-abast-tag ic-abast-interno">Interno CD → Inversa</span>
+                        <span class="ic-abast-tag ic-abast-compra">Compra Entrega → Depósito</span>
                     </div>
 
                 </div>
@@ -461,6 +497,16 @@
                     <option value="todos">Ganho e Perda (todos)</option>
                     <option value="ganho">Somente Ganho</option>
                     <option value="perda">Somente Perda</option>
+
+                </select>
+
+                <select id="filtroFormaAbast">
+
+                    <option value="todos">Abastecimento: todos</option>
+                    <option value="interno">Interno CD (Inversa)</option>
+                    <option value="compra">Compra Entrega (Depósito)</option>
+                    <option value="outro">Outras formas</option>
+                    <option value="sem">Sem forma no arquivo</option>
 
                 </select>
 
@@ -903,9 +949,9 @@
 
     </div>
 
-<script src="script.js?v=9"></script>
-<script src="inventario.js?v=7"></script>
-<script src="sync.js?v=2"></script>
+<script src="script.js?v=10"></script>
+<script src="inventario.js?v=8"></script>
+<script src="sync.js?v=3"></script>
 
 </body>
 

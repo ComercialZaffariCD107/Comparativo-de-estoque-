@@ -9,6 +9,7 @@
 //   - nome contém "posic"    -> Posição de Endereços
 //   - nome contém "diferenc" -> Diferença Estoque CD x Comercial
 //   - nome contém "valor"    -> Valor por Unidade (OPCIONAL)
+//   - nome contém "abastec"  -> Forma de Abastecimento (OPCIONAL)
 // e reprocessa automaticamente sempre que qualquer um dos
 // arquivos monitorados for salvo/atualizado no disco.
 //
@@ -31,10 +32,12 @@ let syncDirHandle = null;
 let syncArquivoPosicoesHandle = null;
 let syncArquivoDiferencaHandle = null;
 let syncArquivoValoresHandle = null; // opcional
+let syncArquivoFormaHandle = null; // opcional
 
 let syncLastModifiedPosicoes = 0;
 let syncLastModifiedDiferenca = 0;
 let syncLastModifiedValores = 0;
+let syncLastModifiedForma = 0;
 
 let syncIntervalId = null;
 
@@ -185,6 +188,7 @@ function syncNormalizar(texto){
 const SYNC_PALAVRA_POSICOES = "posic";
 const SYNC_PALAVRA_DIFERENCA = "diferenc";
 const SYNC_PALAVRA_VALORES = "valor";
+const SYNC_PALAVRA_FORMA = "abastec";
 
 const SYNC_EXT_VALIDAS = [".txt",".csv"];
 
@@ -203,6 +207,7 @@ async function syncVarrerPasta(){
     syncArquivoPosicoesHandle = null;
     syncArquivoDiferencaHandle = null;
     syncArquivoValoresHandle = null;
+    syncArquivoFormaHandle = null;
 
     for await (const [nome, handle] of syncDirHandle.entries()){
 
@@ -212,7 +217,16 @@ async function syncVarrerPasta(){
 
         const nomeNormalizado = syncNormalizar(nome);
 
+        // Forma de Abastecimento checada primeiro pra não
+        // cair em outro tipo por engano
         if(
+            !syncArquivoFormaHandle &&
+            nomeNormalizado.includes(SYNC_PALAVRA_FORMA)
+        ){
+
+            syncArquivoFormaHandle = handle;
+
+        }else if(
             !syncArquivoPosicoesHandle &&
             nomeNormalizado.includes(SYNC_PALAVRA_POSICOES)
         ){
@@ -249,7 +263,7 @@ async function syncVarrerPasta(){
             "Não encontrei na pasta um arquivo pra cada tipo obrigatório.\n\n" +
             "Faltando (renomeie o arquivo pra conter a palavra-chave):\n" +
             faltando.map(f=>"• " + f).join("\n") +
-            '\n\nO arquivo de Valores ("valor...") é opcional.'
+            '\n\nOs arquivos de Valores ("valor...") e Forma de Abastecimento ("abastec...") são opcionais.'
         );
 
         return false;
@@ -294,6 +308,22 @@ async function syncProcessarArquivos(){
         }else{
 
             dadosValores = [];
+
+        }
+
+        if(syncArquivoFormaHandle){
+
+            const arquivoForma =
+            await syncArquivoFormaHandle.getFile();
+
+            mapaFormaAbast =
+            icNormalizarFormaAbast(await lerTXT(arquivoForma));
+
+            atualizarNomeFormaAbast(arquivoForma.name, "🔗 ");
+
+        }else{
+
+            mapaFormaAbast = null;
 
         }
 
@@ -342,7 +372,8 @@ function syncIniciarMonitoramento(){
 
         syncArquivoPosicoesHandle?.name,
         syncArquivoDiferencaHandle?.name,
-        syncArquivoValoresHandle?.name
+        syncArquivoValoresHandle?.name,
+        syncArquivoFormaHandle?.name
 
     ].filter(Boolean).join(" + ");
 
@@ -391,6 +422,21 @@ async function syncChecarMudancas(){
             if(fileValores.lastModified !== syncLastModifiedValores){
 
                 syncLastModifiedValores = fileValores.lastModified;
+
+                mudou = true;
+
+            }
+
+        }
+
+        if(syncArquivoFormaHandle){
+
+            const fileForma =
+            await syncArquivoFormaHandle.getFile();
+
+            if(fileForma.lastModified !== syncLastModifiedForma){
+
+                syncLastModifiedForma = fileForma.lastModified;
 
                 mudou = true;
 
@@ -453,6 +499,13 @@ async function conectarPastaComparativo(){
 
         }
 
+        if(syncArquivoFormaHandle){
+
+            const fileForma = await syncArquivoFormaHandle.getFile();
+            syncLastModifiedForma = fileForma.lastModified;
+
+        }
+
         syncIniciarMonitoramento();
 
     }catch(erro){
@@ -477,6 +530,8 @@ async function desconectarPastaComparativo(){
     syncArquivoPosicoesHandle = null;
     syncArquivoDiferencaHandle = null;
     syncArquivoValoresHandle = null;
+    syncArquivoFormaHandle = null;
+    syncLastModifiedForma = 0;
     syncLastModifiedPosicoes = 0;
     syncLastModifiedDiferenca = 0;
     syncLastModifiedValores = 0;
@@ -525,6 +580,13 @@ async function desconectarPastaComparativo(){
 
         const fileValores = await syncArquivoValoresHandle.getFile();
         syncLastModifiedValores = fileValores.lastModified;
+
+    }
+
+    if(syncArquivoFormaHandle){
+
+        const fileForma = await syncArquivoFormaHandle.getFile();
+        syncLastModifiedForma = fileForma.lastModified;
 
     }
 

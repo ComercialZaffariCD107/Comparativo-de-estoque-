@@ -7,6 +7,61 @@ let dadosDiferenca = [];
 let dadosValores = [];
 let resultado = [];
 
+// Mapa SKU -> forma de abastecimento (opcional, arquivo
+// "Forma de Abastecimento"). Mesma leitura/regra do
+// Inventário Cíclico (icNormalizarFormaAbast em inventario.js):
+//   Interno CD     = Inversa
+//   Compra Entrega = Depósito
+let mapaFormaAbast = null;
+
+// devolve o registro {tipo, rotulo, regra} do SKU ou null
+function obterFormaAbast(sku){
+
+    if(!mapaFormaAbast || !sku) return null;
+
+    return mapaFormaAbast.get(icChaveSku(sku)) || null;
+
+}
+
+// etiqueta HTML pra colocar antes da descrição.
+// classeBase: "ic-abast-tag ic-abast-" na tela,
+//             "abast abast-" nas janelas de impressão
+function etiquetaFormaAbast(sku, classeBase = "ic-abast-tag ic-abast-"){
+
+    const reg = obterFormaAbast(sku);
+
+    if(!reg) return "";
+
+    const texto = reg.regra
+    ? `${reg.rotulo} · ${reg.regra}`
+    : reg.rotulo;
+
+    return `<span class="${classeBase}${reg.tipo}">${texto}</span> `;
+
+}
+
+// atualiza o texto do upload com a contagem de cada tipo
+function atualizarNomeFormaAbast(nomeArquivo, prefixo = ""){
+
+    const el = document.getElementById("nomeFormaAbast");
+
+    if(!el || !mapaFormaAbast) return;
+
+    let internos = 0;
+    let compras = 0;
+
+    mapaFormaAbast.forEach(r=>{
+
+        if(r.tipo === "interno") internos++;
+        else if(r.tipo === "compra") compras++;
+
+    });
+
+    el.innerText =
+    `${prefixo}${nomeArquivo} · ${internos.toLocaleString("pt-BR")} Interno CD · ${compras.toLocaleString("pt-BR")} Compra Entrega`;
+
+}
+
 // =====================================
 // ALTERNÂNCIA DE VIEWS (abas internas)
 // — mesmo HTML/console, múltiplos
@@ -521,6 +576,21 @@ document
 });
 
 document
+.getElementById("arquivoFormaAbast")
+?.addEventListener("change", function(){
+
+    const arquivo = this.files[0];
+
+    document
+    .getElementById("nomeFormaAbast")
+    .innerText =
+    arquivo
+    ? arquivo.name
+    : "Nenhum arquivo selecionado (opcional)";
+
+});
+
+document
 .getElementById("arquivoValores")
 ?.addEventListener("change", function(){
 
@@ -605,6 +675,25 @@ async function processar(){
         arquivoValores
         ? await lerTXT(arquivoValores)
         : [];
+
+        const arquivoFormaAbast =
+        document
+        .getElementById("arquivoFormaAbast")
+        ?.files[0];
+
+        if(arquivoFormaAbast){
+
+            mapaFormaAbast =
+            icNormalizarFormaAbast(await lerTXT(arquivoFormaAbast));
+
+            atualizarNomeFormaAbast(arquivoFormaAbast.name);
+
+        }
+        else{
+
+            mapaFormaAbast = null;
+
+        }
 
         console.log(
             "Posições carregadas:",
@@ -1458,7 +1547,7 @@ function renderizarCards(dados = resultado){
                     </span>
 
                     <span class="item-descricao">
-                        ${item.descricao || "Sem descrição"}
+                        ${etiquetaFormaAbast(item.sku)}${item.descricao || "Sem descrição"}
                     </span>
 
                 </div>
@@ -1905,6 +1994,11 @@ function obterFiltrado(){
     const pavilhoesFiltro =
     obterPavilhoesFiltroAtual();
 
+    const formaFiltro =
+    document
+    .getElementById("filtroFormaAbast")
+    ?.value || "todos";
+
     let filtrado = resultado.filter(item=>{
 
         // SKU: multi-seleção — array vazio = sem
@@ -1963,7 +2057,21 @@ function obterFiltrado(){
                 ruasFiltro.includes(extrairRua(p.endereco))
             );
 
-        return skuOk && qtdOk && valorOk && pavilhaoOk && ruaOk;
+        // forma de abastecimento (só filtra se o arquivo foi carregado)
+
+        const regForma = obterFormaAbast(item.sku);
+
+        const formaOk =
+
+            formaFiltro === "todos" ||
+
+            !mapaFormaAbast ||
+
+            (formaFiltro === "sem" && !regForma) ||
+
+            (regForma && regForma.tipo === formaFiltro);
+
+        return skuOk && qtdOk && valorOk && pavilhaoOk && ruaOk && formaOk;
 
     });
 
@@ -2033,6 +2141,13 @@ window.addEventListener("load",()=>{
 
     document
     .getElementById("ordenarPor")
+    ?.addEventListener(
+        "change",
+        aplicarFiltros
+    );
+
+    document
+    .getElementById("filtroFormaAbast")
     ?.addEventListener(
         "change",
         aplicarFiltros
@@ -2468,6 +2583,23 @@ h1{
 
 }
 
+
+.abast{
+    display:inline-block;
+    font-size:9px;
+    font-weight:bold;
+    padding:1px 6px;
+    margin-right:4px;
+    border-radius:8px;
+    border:1px solid;
+    white-space:nowrap;
+    vertical-align:1px;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+}
+.abast-interno{ background:#fcefdd; color:#b06e00; border-color:#e48b00; }
+.abast-compra{ background:#e4ecf9; color:#2E63A8; border-color:#2E63A8; }
+.abast-outro{ background:#f3f4f6; color:#555; border-color:#bbb; }
 </style>
 
 </head>
@@ -2622,7 +2754,7 @@ h1{
 
             <div class="sku">#${item.sku}</div>
 
-            <div class="descricao">${item.descricao || "Sem descrição"}</div>
+            <div class="descricao">${etiquetaFormaAbast(item.sku, "abast abast-")}${item.descricao || "Sem descrição"}</div>
 
         </div>
 
@@ -2832,7 +2964,7 @@ function imprimirFinanceiro(){
         return `
         <tr class="${classeLinha}">
             <td class="tag">#${item.sku}</td>
-            <td>${item.descricao || "Sem descrição"}</td>
+            <td>${etiquetaFormaAbast(item.sku, "abast abast-")}${item.descricao || "Sem descrição"}</td>
             <td class="centro">${item.diferenca ?? "—"}</td>
             <td class="centro">${valorUnitarioTexto}</td>
             <td class="centro valor">${impactoTexto}</td>
@@ -3069,6 +3201,23 @@ table.itens tr{ page-break-inside:avoid; }
 
 }
 
+
+.abast{
+    display:inline-block;
+    font-size:9px;
+    font-weight:bold;
+    padding:1px 6px;
+    margin-right:4px;
+    border-radius:8px;
+    border:1px solid;
+    white-space:nowrap;
+    vertical-align:1px;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+}
+.abast-interno{ background:#fcefdd; color:#b06e00; border-color:#e48b00; }
+.abast-compra{ background:#e4ecf9; color:#2E63A8; border-color:#2E63A8; }
+.abast-outro{ background:#f3f4f6; color:#555; border-color:#bbb; }
 </style>
 
 </head>
@@ -3216,6 +3365,24 @@ function obterResumoFiltrosAtivos(){
             ? "Somente Ganho"
             : "Somente Perda"
         );
+
+    }
+
+    const formaFiltro =
+    document
+    .getElementById("filtroFormaAbast")
+    ?.value;
+
+    if(formaFiltro && formaFiltro !== "todos" && mapaFormaAbast){
+
+        const nomesForma = {
+            interno: "Interno CD (Inversa)",
+            compra: "Compra Entrega (Depósito)",
+            outro: "Outras formas de abastecimento",
+            sem: "Sem forma de abastecimento"
+        };
+
+        partes.push(nomesForma[formaFiltro] || formaFiltro);
 
     }
 
@@ -3444,7 +3611,7 @@ function montarRelatorioFinanceiro(dadosBase = resultado, resumoFiltro = null){
         return `
         <div class="ri-item ${tipo === "ganho" ? "ri-item--ok" : "ri-item--critico"}">
             <div class="ri-item-topo">
-                <span class="ri-item-sku">#${item.sku} — ${item.descricao || "Sem descrição"}</span>
+                <span class="ri-item-sku">#${item.sku} — ${etiquetaFormaAbast(item.sku)}${item.descricao || "Sem descrição"}</span>
                 <span class="ri-item-diferenca ${tipo === "ganho" ? "ri-dist-valor--ganho" : "ri-dist-valor--perda"}">${impactoFormatado}</span>
             </div>
             <div class="ri-item-linha">
