@@ -12,7 +12,7 @@
         Comparativo de Estoque CD x Comercial
     </title>
 
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=12">
 
     <!-- Papa Parse -->
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -701,6 +701,40 @@
 
                     </div>
 
+                    <div class="upload-box">
+
+                        <label>
+                            🔁 Forma de Abastecimento (opcional)
+                        </label>
+
+                        <label
+                            class="upload-btn"
+                            for="icArquivoFormaAbast">
+
+                            Selecionar Arquivo
+
+                        </label>
+
+                        <input
+                            type="file"
+                            id="icArquivoFormaAbast"
+                            accept=".txt,.csv">
+
+                        <div
+                            class="upload-nome"
+                            id="icNomeFormaAbast">
+
+                            Nenhum arquivo selecionado (opcional)
+
+                        </div>
+
+                        <div class="ic-legenda-abast">
+                            <span class="ic-abast-tag ic-abast-interno">Interno CD → Inversa</span>
+                            <span class="ic-abast-tag ic-abast-compra">Compra Entrega → Depósito</span>
+                        </div>
+
+                    </div>
+
                 </div>
 
                 <br>
@@ -870,7 +904,7 @@
     </div>
 
 <script src="script.js?v=9"></script>
-<script src="inventario.js?v=6"></script>
+<script src="inventario.js?v=7"></script>
 <script src="sync.js?v=2"></script>
 
 </body>

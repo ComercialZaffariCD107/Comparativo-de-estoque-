@@ -2536,3 +2536,55 @@ SINCRONIZAÇÃO AUTOMÁTICA
     font-family:var(--font-mono);
 
 }
+
+/* =========================
+INVENTÁRIO CÍCLICO — FORMA DE ABASTECIMENTO
+========================= */
+
+.ic-legenda-abast{
+
+    display:flex;
+
+    flex-wrap:wrap;
+
+    justify-content:center;
+
+    gap:8px;
+
+    margin-top:14px;
+}
+
+.ic-abast-tag{
+
+    display:inline-block;
+
+    font-family:var(--font-mono);
+
+    font-size:.72rem;
+
+    font-weight:700;
+
+    padding:4px 10px;
+
+    border-radius:999px;
+
+    white-space:nowrap;
+}
+
+.ic-abast-interno{
+
+    background:var(--amber-dim);
+
+    color:#b06e00;
+
+    border:1px solid var(--amber);
+}
+
+.ic-abast-compra{
+
+    background:var(--blue-dim);
+
+    color:var(--blue);
+
+    border:1px solid var(--blue);
+}

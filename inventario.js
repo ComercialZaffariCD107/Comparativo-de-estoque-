@@ -20,6 +20,12 @@
 //     (ENDER = "DEP.RUA.PREDIO.APTO.SALA", uma linha por
 //     endereço FIXO de picking/apanha)
 //
+//   - Forma de Abastecimento (opcional):
+//     Código Produto;Produto : Forma de Abastecimento;...
+//     (a forma vem depois do último " : " da descrição)
+//     Regra: Interno pelo CD  -> "Interno CD"     = Inversa
+//            Compra Entrega   -> "Compra Entrega" = Depósito
+//
 // Fluxo: seleciona rua(s) -> imprime folha de contagem
 // em branco (sem valores do sistema pra conferir, só
 // endereço + produto esperado) pra picking OU pulmão.
@@ -35,6 +41,11 @@ let icRuasDisponiveis = []; // [{codigo:"105", pavilhao:"Pavilhão 2"}, ...]
 // CODIGO_BARRAS;TIPO_CODIGO). null = arquivo não carregado, e a
 // folha de contagem sai sem as colunas DUN/EAN.
 let icMapaDunEan = null;
+
+// Mapa SKU -> { tipo:"interno"|"compra"|"outro", rotulo, regra, original }
+// Vem do TXT "Forma de Abastecimento". null = arquivo não carregado,
+// e a descrição sai sem a etiqueta de abastecimento.
+let icMapaFormaAbast = null;
 
 // chave comparável entre arquivos (sem espaços e sem zeros à esquerda)
 function icChaveSku(valor){
@@ -85,6 +96,21 @@ document
 
     document
     .getElementById("icNomeDunEan")
+    .innerText =
+    arquivo
+    ? arquivo.name
+    : "Nenhum arquivo selecionado (opcional)";
+
+});
+
+document
+.getElementById("icArquivoFormaAbast")
+?.addEventListener("change", function(){
+
+    const arquivo = this.files[0];
+
+    document
+    .getElementById("icNomeFormaAbast")
     .innerText =
     arquivo
     ? arquivo.name
@@ -153,6 +179,44 @@ async function icProcessar(){
         else{
 
             icMapaDunEan = null;
+
+        }
+
+        // Forma de Abastecimento também é opcional
+        const arquivoFormaAbast =
+        document
+        .getElementById("icArquivoFormaAbast")
+        ?.files[0];
+
+        if(arquivoFormaAbast){
+
+            icMapaFormaAbast =
+            icNormalizarFormaAbast(await lerTXT(arquivoFormaAbast));
+
+            const nomeFormaAbast =
+            document.getElementById("icNomeFormaAbast");
+
+            if(nomeFormaAbast && icMapaFormaAbast){
+
+                let internos = 0;
+                let compras = 0;
+
+                icMapaFormaAbast.forEach(r=>{
+
+                    if(r.tipo === "interno") internos++;
+                    else if(r.tipo === "compra") compras++;
+
+                });
+
+                nomeFormaAbast.innerText =
+                `${arquivoFormaAbast.name} · ${internos.toLocaleString("pt-BR")} Interno CD · ${compras.toLocaleString("pt-BR")} Compra Entrega`;
+
+            }
+
+        }
+        else{
+
+            icMapaFormaAbast = null;
 
         }
 
@@ -435,6 +499,109 @@ function icCelulaCodigos(sku, tipo){
     }).join("");
 
     return `<td class="centro cb-cel">${linhas}${resto > 0 ? `<div class="cb-mais">+${resto}</div>` : ""}</td>`;
+
+}
+
+// =====================================
+// FORMA DE ABASTECIMENTO
+// Coluna "Produto : Forma de Abastecimento" traz a
+// descrição e a forma juntas, separadas por " : ".
+// A forma é o trecho depois do ÚLTIMO " : ".
+//   "Interno pelo CD3"            -> Interno CD     (Inversa)
+//   "Compra Entrega CD3 [...]"    -> Compra Entrega (Depósito)
+//   qualquer outra (ex.: "Compra CD FLV") sai com o
+//   nome original, sem regra.
+// =====================================
+
+function icClassificarFormaAbast(forma){
+
+    const f = String(forma ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+
+    if(!f) return null;
+
+    if(f.startsWith("interno")){
+
+        return { tipo:"interno", rotulo:"Interno CD", regra:"Inversa", original:forma };
+
+    }
+
+    if(f.startsWith("compra entrega")){
+
+        return { tipo:"compra", rotulo:"Compra Entrega", regra:"Depósito", original:forma };
+
+    }
+
+    return { tipo:"outro", rotulo:String(forma).trim(), regra:"", original:forma };
+
+}
+
+function icNormalizarFormaAbast(linhas){
+
+    if(!linhas.length) return null;
+
+    const colSeq =
+    detectarColuna(linhas[0], ["código produto","codigo produto","cod produto","seqproduto"]);
+
+    const colForma =
+    detectarColuna(linhas[0], ["forma de abastecimento","forma abastecimento","abastecimento"]);
+
+    if(!colSeq || !colForma){
+
+        alert(
+            "Não consegui identificar as colunas do arquivo Forma de Abastecimento (Código Produto e Produto : Forma de Abastecimento). Abra o console (F12) e confira as colunas."
+        );
+
+        console.log("Colunas Forma de Abastecimento:", Object.keys(linhas[0]));
+
+        return null;
+
+    }
+
+    const mapa = new Map();
+
+    linhas.forEach(l=>{
+
+        const sku = icChaveSku(l[colSeq]);
+
+        const texto = String(l[colForma] ?? "");
+
+        const pos = texto.lastIndexOf(" : ");
+
+        if(!sku || pos < 0) return;
+
+        const reg = icClassificarFormaAbast(texto.slice(pos + 3));
+
+        if(reg && !mapa.has(sku)) mapa.set(sku, reg);
+
+    });
+
+    console.log("Inventário Cíclico — Forma de Abastecimento:", mapa.size, "SKUs");
+
+    return mapa;
+
+}
+
+// Célula de descrição: etiqueta da forma de abastecimento
+// (com a regra Inversa / Depósito) + descrição do produto
+function icCelulaDescricao(sku, descricao){
+
+    const desc = descricao || "—";
+
+    const reg = (sku && icMapaFormaAbast)
+    ? icMapaFormaAbast.get(icChaveSku(sku))
+    : null;
+
+    if(!reg) return `<td>${desc}</td>`;
+
+    const texto = reg.regra
+    ? `${reg.rotulo} · ${reg.regra}`
+    : reg.rotulo;
+
+    return `<td><span class="abast abast-${reg.tipo}">${texto}</span> ${desc}</td>`;
 
 }
 
@@ -939,7 +1106,7 @@ function icImprimirPickings(){
             <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}</td>
             <td class="centro">${item.sku || "—"}</td>
             ${icMapaDunEan ? icCelulaCodigos(item.sku, "dun") + icCelulaCodigos(item.sku, "ean") : ""}
-            <td>${item.descricao || "—"}</td>
+            ${icCelulaDescricao(item.sku, item.descricao)}
             <td class="qtd"><input type="text" class="input-contagem"></td>
         </tr>
         `;
@@ -1031,7 +1198,7 @@ function icImprimirPulmoes(){
             <td class="centro"><span class="status-pill ${statusClasse}">${item.status || "—"}</span></td>
             <td class="centro">${item.sku || "—"}</td>
             ${icMapaDunEan ? icCelulaCodigos(item.sku, "dun") + icCelulaCodigos(item.sku, "ean") : ""}
-            <td>${item.descricao || "—"}</td>
+            ${icCelulaDescricao(item.sku, item.descricao)}
             <td class="qtd"><input type="text" class="input-contagem"></td>
         </tr>
         `;
@@ -1268,6 +1435,35 @@ td.qtd{
 .status-pill.status-bloqueado{ background:#fbe6e8; color:#D9333F; }
 .status-pill.status-inativo{ background:#f0f0f0; color:#888; }
 
+.abast{
+    display:inline-block;
+    font-size:8.5px;
+    font-weight:bold;
+    padding:1px 6px;
+    margin-right:4px;
+    border-radius:8px;
+    border:1px solid;
+    white-space:nowrap;
+    vertical-align:1px;
+}
+
+.abast-interno{ background:#fcefdd; color:#b06e00; border-color:#e48b00; }
+.abast-compra{ background:#e4ecf9; color:#2E63A8; border-color:#2E63A8; }
+.abast-outro{ background:#f3f4f6; color:#555; border-color:#bbb; }
+
+.legenda-abast{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:8px;
+    font-size:11px;
+}
+
+.legenda-abast b{
+    color:#1e3a8a;
+}
+
 .toolbar{
     display:flex;
     justify-content:flex-end;
@@ -1298,7 +1494,8 @@ td.qtd{
         print-color-adjust:exact;
     }
 
-    .status-pill{
+    .status-pill,
+    .abast{
         -webkit-print-color-adjust:exact;
         print-color-adjust:exact;
     }
@@ -1329,6 +1526,14 @@ td.qtd{
     <div><b>Rua(s):</b> ${icResumoRuasSelecionadas()}</div>
     <div><b>Total de endereços:</b> ${total}</div>
 </div>
+
+${icMapaFormaAbast ? `
+<div class="legenda-abast">
+    <b>Forma de abastecimento:</b>
+    <span class="abast abast-interno">Interno CD · Inversa</span>
+    <span class="abast abast-compra">Compra Entrega · Depósito</span>
+</div>
+` : ""}
 
 <div class="assinatura">
     <div class="lote">Lote</div>
