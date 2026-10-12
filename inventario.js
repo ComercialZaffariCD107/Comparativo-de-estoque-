@@ -47,6 +47,22 @@ let icMapaDunEan = null;
 // e a descrição sai sem a etiqueta de abastecimento.
 let icMapaFormaAbast = null;
 
+// Mapa "RUA.PREDIO.APTO.SALA" -> SEQENDEREÇO (opcional).
+// Vem da mesma Posição de Endereços do Comparativo (upload
+// próprio aqui ou, se não enviado, a que já foi processada
+// no Comparativo). null = sem SEQENDEREÇO na impressão.
+let icMapaSeqEndereco = null;
+
+function icSeqEndereco(item){
+
+    if(!icMapaSeqEndereco) return "";
+
+    return icMapaSeqEndereco.get(
+        chaveEndereco(item.rua, item.predio, item.apto, item.sala)
+    ) || "";
+
+}
+
 // chave comparável entre arquivos (sem espaços e sem zeros à esquerda)
 function icChaveSku(valor){
 
@@ -96,6 +112,21 @@ document
 
     document
     .getElementById("icNomeDunEan")
+    .innerText =
+    arquivo
+    ? arquivo.name
+    : "Nenhum arquivo selecionado (opcional)";
+
+});
+
+document
+.getElementById("icArquivoPosicoes")
+?.addEventListener("change", function(){
+
+    const arquivo = this.files[0];
+
+    document
+    .getElementById("icNomePosicoes")
     .innerText =
     arquivo
     ? arquivo.name
@@ -217,6 +248,51 @@ async function icProcessar(){
         else{
 
             icMapaFormaAbast = null;
+
+        }
+
+        // Posição de Endereços (SEQENDEREÇO) — opcional.
+        // Sem upload aqui, reaproveita a posição já
+        // processada no Comparativo (dadosPosicoes).
+        const arquivoPosicoesIc =
+        document
+        .getElementById("icArquivoPosicoes")
+        ?.files[0];
+
+        const nomePosicoesIc =
+        document.getElementById("icNomePosicoes");
+
+        if(arquivoPosicoesIc){
+
+            icMapaSeqEndereco =
+            montarMapaSeqEndereco(await lerTXT(arquivoPosicoesIc));
+
+            if(nomePosicoesIc){
+
+                nomePosicoesIc.innerText =
+                icMapaSeqEndereco
+                ? `${arquivoPosicoesIc.name} · ${icMapaSeqEndereco.size.toLocaleString("pt-BR")} endereços`
+                : `${arquivoPosicoesIc.name} · coluna SEQENDEREÇO não encontrada`;
+
+            }
+
+        }
+        else if(typeof dadosPosicoes !== "undefined" && dadosPosicoes.length){
+
+            icMapaSeqEndereco =
+            montarMapaSeqEndereco(dadosPosicoes);
+
+            if(nomePosicoesIc && icMapaSeqEndereco){
+
+                nomePosicoesIc.innerText =
+                `🔗 Reaproveitada do Comparativo · ${icMapaSeqEndereco.size.toLocaleString("pt-BR")} endereços`;
+
+            }
+
+        }
+        else{
+
+            icMapaSeqEndereco = null;
 
         }
 
@@ -1103,7 +1179,7 @@ function icImprimirPickings(){
 
         linhasHtml += `
         <tr>
-            <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}</td>
+            <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}${htmlSeqEndereco(icSeqEndereco(item))}</td>
             <td class="centro">${item.sku || "—"}</td>
             ${icMapaDunEan ? icCelulaCodigos(item.sku, "dun") + icCelulaCodigos(item.sku, "ean") : ""}
             ${icCelulaDescricao(item.sku, item.descricao)}
@@ -1194,7 +1270,7 @@ function icImprimirPulmoes(){
 
         linhasHtml += `
         <tr>
-            <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}</td>
+            <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}${htmlSeqEndereco(icSeqEndereco(item))}</td>
             <td class="centro"><span class="status-pill ${statusClasse}">${item.status || "—"}</span></td>
             <td class="centro">${item.sku || "—"}</td>
             ${icMapaDunEan ? icCelulaCodigos(item.sku, "dun") + icCelulaCodigos(item.sku, "ean") : ""}
@@ -1349,6 +1425,13 @@ table.itens td.tag{
     font-weight:bold;
     color:#1e3a8a;
     white-space:nowrap;
+}
+
+table.itens td.tag .seq-end{
+    font-weight:normal;
+    font-size:9px;
+    color:#6b7280;
+    margin-left:4px;
 }
 
 table.itens td.centro{

@@ -2610,3 +2610,20 @@ INVENTÁRIO CÍCLICO — FORMA DE ABASTECIMENTO
 
     vertical-align:1px;
 }
+
+/* SEQENDEREÇO (Posição de Endereços) abaixo do endereço no card */
+.endereco-tag .seq-end{
+
+    display:block;
+
+    font-size:.6rem;
+
+    font-weight:500;
+
+    color:var(--text-muted, #6b7280);
+
+    letter-spacing:.02em;
+
+    margin-top:1px;
+
+}

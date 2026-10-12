@@ -873,6 +873,89 @@ function detectarColuna(objeto, candidatos){
 }
 
 // =====================================
+// SEQENDEREÇO
+// Vem do mesmo arquivo de Posição de Endereços
+// (nenhuma consulta nova). Cabeçalho pode vir
+// como SEQENDERECO / SEQENDEREÇO / SEQEND.
+// Reaproveitado também pelo Inventário Cíclico.
+// =====================================
+
+const CANDIDATOS_SEQENDERECO =
+["seqendereco","seqendereço","seqend","seq_endereco","seq_end"];
+
+function detectarColunaSeqEndereco(linhas){
+
+    const coluna =
+    detectarColuna(linhas?.[0], CANDIDATOS_SEQENDERECO);
+
+    if(!coluna && linhas?.length){
+
+        console.warn(
+            "Coluna SEQENDEREÇO não encontrada na Posição de Endereços. Colunas disponíveis:",
+            Object.keys(linhas[0])
+        );
+
+    }
+
+    return coluna;
+
+}
+
+// chave comparável de endereço RUA.PREDIO.APTO.SALA
+// (sem espaços e sem zeros à esquerda em cada parte,
+// pra "072.01.21.1" bater com "72.1.21.1")
+function chaveEndereco(rua, predio, apto, sala){
+
+    return [rua, predio, apto, sala]
+    .map(v=> String(v ?? "").trim().replace(/^0+(?=\d)/, ""))
+    .join(".");
+
+}
+
+// Mapa "RUA.PREDIO.APTO.SALA" -> SEQENDEREÇO a partir
+// das linhas cruas da Posição de Endereços (lerTXT).
+// Retorna null se não houver dados ou coluna.
+function montarMapaSeqEndereco(linhas){
+
+    if(!linhas?.length) return null;
+
+    const colSeq = detectarColunaSeqEndereco(linhas);
+
+    if(!colSeq) return null;
+
+    const mapa = new Map();
+
+    linhas.forEach(p=>{
+
+        const seq = normalizarCodigo(p[colSeq]);
+
+        if(!seq) return;
+
+        const chave =
+        chaveEndereco(p.CODRUA, p.NROPREDIO, p.NROAPARTAMENTO, p.NROSALA);
+
+        if(!mapa.has(chave)){
+
+            mapa.set(chave, seq);
+
+        }
+
+    });
+
+    return mapa;
+
+}
+
+// trecho de HTML "SEQENDEREÇO 417128" pra impressão/tela
+function htmlSeqEndereco(seq){
+
+    return seq
+    ? ` <span class="seq-end">SEQENDEREÇO ${seq}</span>`
+    : "";
+
+}
+
+// =====================================
 // GERAR COMPARATIVO
 // =====================================
 
@@ -988,6 +1071,14 @@ function gerarComparativo(){
 
     const mapaPulmoes = Object.create(null);
 
+    // SEQENDEREÇO: mesma Posição de Endereços,
+    // só mais uma coluna lida
+    const colSeqEndereco =
+    detectarColunaSeqEndereco(dadosPosicoes);
+
+    const lerSeqEndereco = p =>
+    colSeqEndereco ? normalizarCodigo(p?.[colSeqEndereco]) : "";
+
     dadosPosicoes.forEach(p=>{
 
         const codigo =
@@ -1065,6 +1156,9 @@ function gerarComparativo(){
         const quantidadeApanha =
         Number(posicaoApanha?.QTD_END || 0);
 
+        const seqEnderecoApanha =
+        posicaoApanha ? lerSeqEndereco(posicaoApanha) : "";
+
         const pulmoesBrutos =
         mapaPulmoes[sku] || [];
 
@@ -1078,7 +1172,10 @@ function gerarComparativo(){
             Number(p.QTD_END || 0),
 
             embalagem:
-            Number(p.EMBALAGEM || 0)
+            Number(p.EMBALAGEM || 0),
+
+            seqEndereco:
+            lerSeqEndereco(p)
 
         }));
 
@@ -1134,6 +1231,8 @@ function gerarComparativo(){
             : null,
 
             enderecoApanha,
+
+            seqEnderecoApanha,
 
             quantidadeApanha,
 
@@ -1459,6 +1558,7 @@ function renderizarCards(dados = resultado){
 
             linhasEndereco.push({
                 endereco: item.enderecoApanha,
+                seqEndereco: item.seqEnderecoApanha,
                 tipo: "Apanha",
                 qtdSistema: null
             });
@@ -1469,6 +1569,7 @@ function renderizarCards(dados = resultado){
 
             linhasEndereco.push({
                 endereco: p.endereco,
+                seqEndereco: p.seqEndereco,
                 tipo: "Pulmão",
                 qtdSistema: p.quantidade
             });
@@ -1485,7 +1586,7 @@ function renderizarCards(dados = resultado){
 
             return `
                 <div class="endereco-linha ${l.tipo === "Apanha" ? "linha-apanha" : ""} ${semQtd ? "linha-vazia" : ""}">
-                    <span class="endereco-tag">${l.endereco}</span>
+                    <span class="endereco-tag">${l.endereco}${htmlSeqEndereco(l.seqEndereco)}</span>
                     <span class="endereco-tipo ${l.tipo === "Apanha" ? "tipo-apanha" : ""}">${l.tipo}</span>
                     <span class="qtd-sistema">${semQtd ? "—" : l.qtdSistema}</span>
                 </div>`;
@@ -2413,6 +2514,20 @@ h1{
 
 }
 
+.enderecos td.tag .seq-end{
+
+    font-weight:normal;
+
+    font-size:9px;
+
+    color:#6b7280;
+
+    margin-left:4px;
+
+    white-space:nowrap;
+
+}
+
 .enderecos tr.apanha td.tag{
 
     color:#2E63A8;
@@ -2650,6 +2765,7 @@ h1{
 
             linhasEndereco.push({
                 endereco: item.enderecoApanha,
+                seqEndereco: item.seqEnderecoApanha,
                 tipo: "Apanha",
                 qtdSistema: Number(item.quantidadeApanha) || 0
             });
@@ -2660,6 +2776,7 @@ h1{
 
             linhasEndereco.push({
                 endereco: p.endereco,
+                seqEndereco: p.seqEndereco,
                 tipo: "Pulmão",
                 qtdSistema: p.quantidade
             });
@@ -2698,7 +2815,7 @@ h1{
 
             return `
                 <tr class="${l.tipo === "Apanha" ? "apanha" : ""}" data-linha-sku="${item.sku}">
-                    <td class="tag">${l.endereco}</td>
+                    <td class="tag">${l.endereco}${htmlSeqEndereco(l.seqEndereco)}</td>
                     <td>${l.tipo}</td>
                     <td class="centro">${sistemaTexto}</td>
                     <td class="encontrada">
