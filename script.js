@@ -586,21 +586,6 @@ document
     .innerText =
     arquivo
     ? arquivo.name
-    : "Nenhum arquivo selecionado (opcional)";
-
-});
-
-document
-.getElementById("arquivoValores")
-?.addEventListener("change", function(){
-
-    const arquivo = this.files[0];
-
-    document
-    .getElementById("nomeValores")
-    .innerText =
-    arquivo
-    ? arquivo.name
     : "Nenhum arquivo selecionado";
 
 });
@@ -645,11 +630,6 @@ async function processar(){
         .getElementById("arquivoDiferenca")
         .files[0];
 
-        const arquivoValores =
-        document
-        .getElementById("arquivoValores")
-        ?.files[0];
-
         if(
             !arquivoPosicoes ||
             !arquivoDiferenca
@@ -671,11 +651,9 @@ async function processar(){
         dadosDiferenca =
         await lerTXT(arquivoDiferenca);
 
-        dadosValores =
-        arquivoValores
-        ? await lerTXT(arquivoValores)
-        : [];
-
+        // Forma de Abastecimento: a MESMA consulta traz a
+        // forma (Interno CD / Compra Entrega) e o custo bruto
+        // unitário. Lê uma vez só e alimenta as duas coisas.
         const arquivoFormaAbast =
         document
         .getElementById("arquivoFormaAbast")
@@ -683,13 +661,20 @@ async function processar(){
 
         if(arquivoFormaAbast){
 
+            const linhasForma =
+            await lerTXT(arquivoFormaAbast);
+
+            dadosValores = linhasForma;
+
             mapaFormaAbast =
-            icNormalizarFormaAbast(await lerTXT(arquivoFormaAbast));
+            icNormalizarFormaAbast(linhasForma);
 
             atualizarNomeFormaAbast(arquivoFormaAbast.name);
 
         }
         else{
+
+            dadosValores = [];
 
             mapaFormaAbast = null;
 
@@ -708,7 +693,7 @@ async function processar(){
         );
 
         console.log(
-            "Valores carregados:",
+            "Valores (via Forma de Abastecimento):",
             dadosValores.length,
             Object.keys(dadosValores[0] || {})
         );
@@ -827,6 +812,16 @@ function parseNumeroPtBR(valor){
 // nomes possíveis (evita quebrar se o
 // arquivo vier com cabeçalho levemente
 // diferente no futuro)
+
+// coluna de custo no arquivo Forma de Abastecimento
+// (do mais específico pro mais genérico)
+const CANDIDATOS_CUSTO_UNITARIO = [
+    "cto bruto unitário","custo bruto unitário",
+    "cto bruto unitario","custo bruto unitario",
+    "cto bruto","custo bruto",
+    "custo unitário","custo unitario",
+    "valor unitário","valor unitario"
+];
 
 function detectarColuna(objeto, candidatos){
 
@@ -1021,7 +1016,7 @@ function gerarComparativo(){
 
     // =====================================
     // MAPA DE VALOR POR UNIDADE
-    // (arquivo "Análise ABC do Estoque":
+    // (vem do próprio arquivo Forma de Abastecimento:
     // Código Produto -> Cto Bruto Unitário)
     // =====================================
 
@@ -1034,7 +1029,7 @@ function gerarComparativo(){
     const colValorUnitario =
     detectarColuna(
         dadosValores[0],
-        ["cto bruto unitário","custo bruto unitário","cto bruto unitario","custo bruto unitario"]
+        CANDIDATOS_CUSTO_UNITARIO
     );
 
     const mapaValores = Object.create(null);
@@ -1044,7 +1039,7 @@ function gerarComparativo(){
         dadosValores.forEach(v=>{
 
             const codigo =
-            normalizarCodigo(v[colCodigoValor]);
+            icChaveSku(normalizarCodigo(v[colCodigoValor]));
 
             if(!codigo){
 
@@ -1052,8 +1047,16 @@ function gerarComparativo(){
 
             }
 
-            mapaValores[codigo] =
+            const valor =
             parseNumeroPtBR(v[colValorUnitario]);
+
+            // a consulta pode repetir o SKU (uma linha por
+            // forma/loja); fica com o primeiro valor válido
+            if(valor !== null && !(codigo in mapaValores)){
+
+                mapaValores[codigo] = valor;
+
+            }
 
         });
 
@@ -1061,9 +1064,17 @@ function gerarComparativo(){
     else if(dadosValores.length){
 
         console.log(
-            "Não consegui identificar as colunas do arquivo de valores. Colunas disponíveis:",
+            "Não encontrei a coluna de custo bruto unitário no arquivo Forma de Abastecimento. Colunas disponíveis:",
             Object.keys(dadosValores[0])
         );
+
+        const elNome = document.getElementById("nomeFormaAbast");
+
+        if(elNome && !elNome.innerText.includes("sem custo")){
+
+            elNome.innerText += " · ⚠ sem custo bruto (veja F12)";
+
+        }
 
     }
 
@@ -1194,7 +1205,7 @@ function gerarComparativo(){
         : (pulmoes.find(p=>p.embalagem > 1)?.embalagem || embalagemApanha || 1);
 
         const valorUnitario =
-        mapaValores[sku] ?? null;
+        mapaValores[icChaveSku(sku)] ?? null;
 
         const diferencaNum =
         colDiferenca

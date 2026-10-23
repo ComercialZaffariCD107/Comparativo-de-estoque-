@@ -145,43 +145,14 @@
 
                 </div>
 
-                <!-- VALOR UNITÁRIO -->
+                <!-- FORMA DE ABASTECIMENTO + VALOR UNITÁRIO
+                     (uma única consulta traz as duas informações:
+                     forma de abastecimento e custo bruto unitário) -->
 
                 <div class="upload-box">
 
                     <label>
-                        💲 Valor por Unidade (Custo Bruto)
-                    </label>
-
-                    <label
-                        class="upload-btn"
-                        for="arquivoValores">
-
-                        Selecionar Arquivo
-
-                    </label>
-
-                    <input
-                        type="file"
-                        id="arquivoValores"
-                        accept=".txt,.csv">
-
-                    <div
-                        class="upload-nome"
-                        id="nomeValores">
-
-                        Nenhum arquivo selecionado
-
-                    </div>
-
-                </div>
-
-                <!-- FORMA DE ABASTECIMENTO -->
-
-                <div class="upload-box">
-
-                    <label>
-                        🔁 Forma de Abastecimento (opcional)
+                        🔁 Forma de Abastecimento + 💲 Custo Bruto
                     </label>
 
                     <label
@@ -201,7 +172,7 @@
                         class="upload-nome"
                         id="nomeFormaAbast">
 
-                        Nenhum arquivo selecionado (opcional)
+                        Nenhum arquivo selecionado
 
                     </div>
 

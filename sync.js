@@ -4,12 +4,12 @@
 //
 // Conecta a subpasta "Comparativo de Estoque" (dentro da
 // pasta mestre) uma única vez. A partir daí, detecta sozinho
-// os 3 arquivos pelo NOME (todos são .txt/.csv, então não dá
+// os arquivos pelo NOME (todos são .txt/.csv, então não dá
 // pra usar extensão como no Gerador de Abastecimento):
 //   - nome contém "posic"    -> Posição de Endereços
 //   - nome contém "diferenc" -> Diferença Estoque CD x Comercial
-//   - nome contém "valor"    -> Valor por Unidade (OPCIONAL)
 //   - nome contém "abastec"  -> Forma de Abastecimento (OPCIONAL)
+//                               (traz também o Custo Bruto Unitário)
 // e reprocessa automaticamente sempre que qualquer um dos
 // arquivos monitorados for salvo/atualizado no disco.
 //
@@ -18,7 +18,7 @@
 //
 // IMPORTANTE: renomeie os arquivos na pasta mestre pra
 // conter essas palavras-chave no nome (ex: "Posicao_Enderecos.txt",
-// "Diferenca_Estoque.txt", "Valores.txt").
+// "Diferenca_Estoque.txt", "Forma_Abastecimento.txt").
 // ========================================================
 // ========================================================
 
@@ -31,12 +31,10 @@ let syncDirHandle = null;
 
 let syncArquivoPosicoesHandle = null;
 let syncArquivoDiferencaHandle = null;
-let syncArquivoValoresHandle = null; // opcional
 let syncArquivoFormaHandle = null; // opcional
 
 let syncLastModifiedPosicoes = 0;
 let syncLastModifiedDiferenca = 0;
-let syncLastModifiedValores = 0;
 let syncLastModifiedForma = 0;
 
 let syncIntervalId = null;
@@ -187,7 +185,6 @@ function syncNormalizar(texto){
 
 const SYNC_PALAVRA_POSICOES = "posic";
 const SYNC_PALAVRA_DIFERENCA = "diferenc";
-const SYNC_PALAVRA_VALORES = "valor";
 const SYNC_PALAVRA_FORMA = "abastec";
 
 const SYNC_EXT_VALIDAS = [".txt",".csv"];
@@ -206,7 +203,6 @@ async function syncVarrerPasta(){
 
     syncArquivoPosicoesHandle = null;
     syncArquivoDiferencaHandle = null;
-    syncArquivoValoresHandle = null;
     syncArquivoFormaHandle = null;
 
     for await (const [nome, handle] of syncDirHandle.entries()){
@@ -240,18 +236,12 @@ async function syncVarrerPasta(){
 
             syncArquivoDiferencaHandle = handle;
 
-        }else if(
-            !syncArquivoValoresHandle &&
-            nomeNormalizado.includes(SYNC_PALAVRA_VALORES)
-        ){
-
-            syncArquivoValoresHandle = handle;
-
         }
 
     }
 
-    // Valores é opcional — só Posições e Diferença são obrigatórios
+    // Forma de Abastecimento (forma + custo) é opcional —
+    // só Posições e Diferença são obrigatórios
     const faltando = [];
 
     if(!syncArquivoPosicoesHandle) faltando.push('"posic..." (Posição de Endereços)');
@@ -263,7 +253,7 @@ async function syncVarrerPasta(){
             "Não encontrei na pasta um arquivo pra cada tipo obrigatório.\n\n" +
             "Faltando (renomeie o arquivo pra conter a palavra-chave):\n" +
             faltando.map(f=>"• " + f).join("\n") +
-            '\n\nOs arquivos de Valores ("valor...") e Forma de Abastecimento ("abastec...") são opcionais.'
+            '\n\nO arquivo de Forma de Abastecimento ("abastec...", que também traz o custo) é opcional.'
         );
 
         return false;
@@ -294,34 +284,26 @@ async function syncProcessarArquivos(){
         dadosDiferenca =
         await lerTXT(arquivoDiferenca);
 
-        if(syncArquivoValoresHandle){
-
-            const arquivoValores =
-            await syncArquivoValoresHandle.getFile();
-
-            dadosValores =
-            await lerTXT(arquivoValores);
-
-            document.getElementById("nomeValores").innerText =
-            "🔗 " + arquivoValores.name + " (auto)";
-
-        }else{
-
-            dadosValores = [];
-
-        }
-
+        // mesma consulta alimenta forma de abastecimento
+        // e custo bruto unitário
         if(syncArquivoFormaHandle){
 
             const arquivoForma =
             await syncArquivoFormaHandle.getFile();
 
+            const linhasForma =
+            await lerTXT(arquivoForma);
+
+            dadosValores = linhasForma;
+
             mapaFormaAbast =
-            icNormalizarFormaAbast(await lerTXT(arquivoForma));
+            icNormalizarFormaAbast(linhasForma);
 
             atualizarNomeFormaAbast(arquivoForma.name, "🔗 ");
 
         }else{
+
+            dadosValores = [];
 
             mapaFormaAbast = null;
 
@@ -372,7 +354,6 @@ function syncIniciarMonitoramento(){
 
         syncArquivoPosicoesHandle?.name,
         syncArquivoDiferencaHandle?.name,
-        syncArquivoValoresHandle?.name,
         syncArquivoFormaHandle?.name
 
     ].filter(Boolean).join(" + ");
@@ -411,21 +392,6 @@ async function syncChecarMudancas(){
             syncLastModifiedDiferenca = fileDiferenca.lastModified;
 
             mudou = true;
-
-        }
-
-        if(syncArquivoValoresHandle){
-
-            const fileValores =
-            await syncArquivoValoresHandle.getFile();
-
-            if(fileValores.lastModified !== syncLastModifiedValores){
-
-                syncLastModifiedValores = fileValores.lastModified;
-
-                mudou = true;
-
-            }
 
         }
 
@@ -492,13 +458,6 @@ async function conectarPastaComparativo(){
         const fileDiferenca = await syncArquivoDiferencaHandle.getFile();
         syncLastModifiedDiferenca = fileDiferenca.lastModified;
 
-        if(syncArquivoValoresHandle){
-
-            const fileValores = await syncArquivoValoresHandle.getFile();
-            syncLastModifiedValores = fileValores.lastModified;
-
-        }
-
         if(syncArquivoFormaHandle){
 
             const fileForma = await syncArquivoFormaHandle.getFile();
@@ -529,12 +488,10 @@ async function desconectarPastaComparativo(){
     syncDirHandle = null;
     syncArquivoPosicoesHandle = null;
     syncArquivoDiferencaHandle = null;
-    syncArquivoValoresHandle = null;
     syncArquivoFormaHandle = null;
     syncLastModifiedForma = 0;
     syncLastModifiedPosicoes = 0;
     syncLastModifiedDiferenca = 0;
-    syncLastModifiedValores = 0;
 
     await syncLimparHandle();
 
@@ -575,13 +532,6 @@ async function desconectarPastaComparativo(){
 
     const fileDiferenca = await syncArquivoDiferencaHandle.getFile();
     syncLastModifiedDiferenca = fileDiferenca.lastModified;
-
-    if(syncArquivoValoresHandle){
-
-        const fileValores = await syncArquivoValoresHandle.getFile();
-        syncLastModifiedValores = fileValores.lastModified;
-
-    }
 
     if(syncArquivoFormaHandle){
 
