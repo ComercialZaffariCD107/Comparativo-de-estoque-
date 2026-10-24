@@ -781,6 +781,50 @@
 
                     </div>
 
+                    <!-- DEMONSTRATIVO: o que cada arquivo puxa -->
+
+                    <div class="ic-demonstrativo">
+
+                        <div class="ic-demo-titulo">
+                            📋 O que cada arquivo puxa
+                        </div>
+
+                        <div class="ic-demo-linha">
+                            <div class="ic-demo-nome">📗 Estoque Pulmão <span class="ic-demo-obrig">obrigatório</span></div>
+                            <div class="ic-demo-desc">Todos os endereços de pulmão, ocupados ou vazios, com o produto e o status. Endereços inativos ficam fora. Monta a lista de ruas por pavilhão e a folha de pulmão.</div>
+                            <div class="ic-demo-cols"><code>CODRUA</code><code>NROPREDIO</code><code>NROAPARTAMENTO</code><code>NROSALA</code><code>SEQPRODUTO</code><code>DESCRICAO</code><code>STATUS</code></div>
+                        </div>
+
+                        <div class="ic-demo-linha">
+                            <div class="ic-demo-nome">🛣️ Ruas Fixas <span class="ic-demo-obrig">obrigatório</span></div>
+                            <div class="ic-demo-desc">Endereços fixos de apanha e o SKU esperado em cada um. Monta a folha de picking.</div>
+                            <div class="ic-demo-cols"><code>ENDER</code><code>SEQPRODUTO</code><code>DESCCOMPLETA</code></div>
+                        </div>
+
+                        <div class="ic-demo-linha">
+                            <div class="ic-demo-nome">📍 Posição de Endereços <span class="ic-demo-opc">opcional</span></div>
+                            <div class="ic-demo-desc">O SEQENDEREÇO de cada endereço, impresso ao lado dele. Sem envio, reaproveita a posição já processada no Comparativo.</div>
+                            <div class="ic-demo-cols"><code>SEQENDEREÇO</code><code>CODRUA</code><code>NROPREDIO</code><code>NROAPARTAMENTO</code><code>NROSALA</code></div>
+                        </div>
+
+                        <div class="ic-demo-linha">
+                            <div class="ic-demo-nome">🏷️ DUN / EAN <span class="ic-demo-opc">opcional</span></div>
+                            <div class="ic-demo-desc">Códigos de barras de caixa (DUN) e unidade (EAN), com a quantidade por embalagem. Adiciona as colunas DUN e EAN na folha.</div>
+                            <div class="ic-demo-cols"><code>SEQPRODUTO</code><code>CODIGO_BARRAS</code><code>TIPO_CODIGO</code><code>QTDEMBALAGEM</code></div>
+                        </div>
+
+                        <div class="ic-demo-linha">
+                            <div class="ic-demo-nome">🔁 Forma de Abastecimento <span class="ic-demo-opc">opcional</span></div>
+                            <div class="ic-demo-desc">Como o produto é abastecido. Coloca a etiqueta Interno CD → Inversa ou Compra Entrega → Depósito na descrição.</div>
+                            <div class="ic-demo-cols"><code>Código Produto</code><code>Produto : Forma de Abastecimento</code></div>
+                        </div>
+
+                        <div class="ic-demo-rodape">
+                            Nenhum arquivo traz quantidade de sistema: a folha de contagem sai em branco, só com endereço e produto esperado.
+                        </div>
+
+                    </div>
+
                 </div>
 
                 <br>
