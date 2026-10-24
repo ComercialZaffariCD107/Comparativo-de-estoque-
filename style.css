@@ -2630,34 +2630,45 @@ INVENTÁRIO CÍCLICO — FORMA DE ABASTECIMENTO
 
 
 /* =========================
-INVENTÁRIO CÍCLICO — DEMONSTRATIVO DOS ARQUIVOS
+INVENTÁRIO CÍCLICO — REFERÊNCIA DOS ARQUIVOS
 Ocupa o espaço ao lado de Forma de Abastecimento
 ========================= */
 
-.ic-demonstrativo{
+/* grade fixa no Inventário: 4 colunas -> 5º box + referência
+   dividem a 2ª linha; 2 colunas no médio; 1 no celular */
+#view-inventario .upload-area{
+
+    grid-template-columns:repeat(4, minmax(0,1fr));
+}
+
+.ic-referencia{
 
     grid-column:2 / -1;
 
-    border:1px solid var(--border);
+    display:flex;
 
-    border-left:3px solid var(--amber);
+    flex-direction:column;
+
+    border:1px solid var(--border);
 
     border-radius:var(--radius);
 
     background:var(--surface);
 
-    padding:16px 20px;
-
-    text-align:left;
+    overflow:hidden;
 }
 
-.ic-demo-titulo{
+.ic-ref-titulo{
+
+    margin:0;
+
+    padding:14px 18px;
 
     font-family:var(--font-display);
 
-    font-size:.95rem;
-
     font-weight:600;
+
+    font-size:.9rem;
 
     letter-spacing:.06em;
 
@@ -2665,142 +2676,144 @@ Ocupa o espaço ao lado de Forma de Abastecimento
 
     color:var(--text);
 
-    margin-bottom:10px;
+    border-bottom:1px solid var(--border);
 }
 
-.ic-demo-linha{
+.ic-referencia .ic-ref-tabela{
 
-    display:grid;
+    width:100%;
 
-    grid-template-columns:220px 1fr;
+    min-width:0;
 
-    column-gap:16px;
+    border-collapse:collapse;
 
-    row-gap:4px;
-
-    padding:9px 0;
-
-    border-top:1px dashed var(--border);
+    table-layout:fixed;
 }
 
-.ic-demo-nome{
+.ic-ref-tabela th{
 
-    grid-row:span 2;
+    padding:8px 18px;
 
-    font-size:.8rem;
+    border:none;
 
-    font-weight:700;
-
-    color:var(--text);
-}
-
-.ic-demo-obrig,
-.ic-demo-opc{
-
-    display:inline-block;
-
-    margin-top:4px;
-
-    font-family:var(--font-mono);
-
-    font-size:.62rem;
-
-    font-weight:700;
-
-    padding:1px 7px;
-
-    border-radius:999px;
-
-    text-transform:uppercase;
-
-    letter-spacing:.04em;
-}
-
-.ic-demo-obrig{
-
-    background:var(--green-dim);
-
-    color:var(--green);
-
-    border:1px solid var(--green);
-}
-
-.ic-demo-opc{
+    text-align:left;
 
     background:var(--surface-alt);
 
     color:var(--text-muted);
 
-    border:1px solid var(--border-light);
+    font-size:.68rem;
+
+    border-bottom:1px solid var(--border);
 }
 
-.ic-demo-desc{
+.ic-ref-tabela th:nth-child(1){ width:24%; }
+.ic-ref-tabela th:nth-child(2){ width:42%; }
+.ic-ref-tabela th:nth-child(3){ width:34%; }
+
+.ic-ref-tabela th,
+.ic-ref-tabela td{
+
+    border:none;
+}
+
+.ic-ref-tabela td{
+
+    font-family:var(--font-body);
+
+    padding:10px 18px;
+
+    vertical-align:top;
+
+    text-align:left;
+
+    border-bottom:1px solid var(--border);
 
     font-size:.8rem;
 
     line-height:1.45;
+}
+
+.ic-ref-tabela tbody tr:last-child td{ border-bottom:none; }
+
+.ic-ref-tabela tbody tr,
+.ic-ref-tabela tbody tr:nth-child(even),
+.ic-ref-tabela tbody tr:hover{ background:transparent; }
+
+.ic-ref-nome{
+
+    display:block;
+
+    font-weight:600;
+
+    color:var(--text);
+}
+
+.ic-ref-req{
+
+    display:block;
+
+    margin-top:2px;
+
+    font-size:.72rem;
 
     color:var(--text-muted);
 }
 
-.ic-demo-cols{
+.ic-ref-req.ic-ref-obrigatorio{
 
-    display:flex;
+    color:var(--green);
 
-    flex-wrap:wrap;
-
-    gap:4px;
+    font-weight:600;
 }
 
-.ic-demo-cols code{
+.ic-ref-uso{ color:var(--text); }
+
+.ic-ref-tabela td.ic-ref-colunas{
 
     font-family:var(--font-mono);
 
-    font-size:.66rem;
+    font-size:.7rem;
 
-    padding:1px 6px;
+    color:var(--text-muted);
 
-    border-radius:var(--radius-sm);
-
-    background:var(--blue-dim);
-
-    color:var(--blue);
+    word-break:break-word;
 }
 
-.ic-demo-rodape{
+.ic-ref-nota{
 
-    margin-top:6px;
+    margin:auto 0 0;
 
-    padding-top:10px;
+    padding:10px 18px;
 
-    border-top:1px dashed var(--border);
+    background:var(--surface-alt);
+
+    border-top:1px solid var(--border);
 
     font-size:.75rem;
 
-    font-style:italic;
-
     color:var(--text-muted);
-}
-
-/* grade fixa no Inventário: 4 colunas -> 5º box + demonstrativo
-   dividem a 2ª linha; 2 colunas no médio; 1 no celular */
-#view-inventario .upload-area{
-
-    grid-template-columns:repeat(4, minmax(0,1fr));
 }
 
 @media(max-width:1200px){
 
     #view-inventario .upload-area{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+
+    .ic-referencia{ grid-column:1 / -1; }
 }
 
 @media(max-width:900px){
 
     #view-inventario .upload-area{ grid-template-columns:1fr; }
 
-    .ic-demonstrativo{ grid-column:1 / -1; }
+    .ic-ref-tabela thead{ display:none; }
 
-    .ic-demo-linha{ grid-template-columns:1fr; }
+    .ic-ref-tabela,
+    .ic-ref-tabela tbody,
+    .ic-ref-tabela tr,
+    .ic-ref-tabela td{ display:block; width:auto; }
 
-    .ic-demo-nome{ grid-row:auto; }
+    .ic-ref-tabela tr{ border-bottom:1px solid var(--border); padding:6px 0; }
+
+    .ic-ref-tabela td{ border-bottom:none; padding:4px 18px; }
 }
