@@ -183,6 +183,52 @@
 
                 </div>
 
+                <!-- REFERÊNCIA: o que cada arquivo traz -->
+
+                <div class="ic-referencia ic-referencia-linha">
+
+                    <h3 class="ic-ref-titulo">Referência dos arquivos</h3>
+
+                    <table class="ic-ref-tabela">
+                        <thead>
+                            <tr>
+                                <th>Arquivo</th>
+                                <th>O que traz</th>
+                                <th>Colunas lidas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="ic-ref-arquivo">
+                                    <span class="ic-ref-nome">Posição de Endereços</span>
+                                    <span class="ic-ref-req ic-ref-obrigatorio">Obrigatório</span>
+                                </td>
+                                <td class="ic-ref-uso">Endereços de apanha e pulmão de cada produto, com quantidade e embalagem. Gera as linhas de endereço e a conversão em caixas.</td>
+                                <td class="ic-ref-colunas">CODIGO, CODRUA, NROPREDIO, NROAPARTAMENTO, NROSALA, ESPECIE_END, QTD_END, EMBALAGEM, SEQENDEREÇO</td>
+                            </tr>
+                            <tr>
+                                <td class="ic-ref-arquivo">
+                                    <span class="ic-ref-nome">Diferença Estoque CD Locus x Comercial</span>
+                                    <span class="ic-ref-req ic-ref-obrigatorio">Obrigatório</span>
+                                </td>
+                                <td class="ic-ref-uso">Define quais produtos entram no comparativo e a diferença de cada um entre os dois sistemas.</td>
+                                <td class="ic-ref-colunas">SEQPRODUTO, DESCCOMPLETA, DIF_ESTOQUE, STATUS</td>
+                            </tr>
+                            <tr>
+                                <td class="ic-ref-arquivo">
+                                    <span class="ic-ref-nome">Forma de Abastecimento + Custo Bruto</span>
+                                    <span class="ic-ref-req ">Opcional</span>
+                                </td>
+                                <td class="ic-ref-uso">Identifica o produto como Inversa (Interno CD) ou Depósito (Compra Entrega) e traz o custo unitário usado no valor da divergência.</td>
+                                <td class="ic-ref-colunas">Código Produto, Produto : Forma de Abastecimento, Cto Bruto Unitário</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <p class="ic-ref-nota">Só entram no comparativo os produtos que aparecem no arquivo de Diferença de Estoque.</p>
+
+                </div>
+
             </div>
 
             <br>

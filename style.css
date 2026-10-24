@@ -2795,6 +2795,10 @@ Ocupa o espaço ao lado de Forma de Abastecimento
     color:var(--text-muted);
 }
 
+/* no Comparativo a referência ocupa a linha inteira
+   abaixo dos três arquivos */
+.ic-referencia.ic-referencia-linha{ grid-column:1 / -1; }
+
 @media(max-width:1200px){
 
     #view-inventario .upload-area{ grid-template-columns:repeat(2, minmax(0,1fr)); }
