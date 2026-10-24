@@ -2559,6 +2559,16 @@ h1{
 
 }
 
+.enderecos td.encontrada .unidade-contagem{
+
+    margin-left:6px;
+
+    font-size:11px;
+
+    color:#555;
+
+}
+
 .enderecos tr.confere td.encontrada{
 
     color:#1E9E5C;
@@ -2822,13 +2832,10 @@ h1{
             const sistemaComparacao =
             podeConverterCx ? sistemaUn / embalagemItem : sistemaUn;
 
-            const sistemaTexto = `${sistemaComparacao} ${unidade}`;
-
             return `
                 <tr class="${l.tipo === "Apanha" ? "apanha" : ""}" data-linha-sku="${item.sku}">
                     <td class="tag">${l.endereco}${htmlSeqEndereco(l.seqEndereco)}</td>
                     <td>${l.tipo}</td>
-                    <td class="centro">${sistemaTexto}</td>
                     <td class="encontrada">
                         <input
                             type="number"
@@ -2841,13 +2848,13 @@ h1{
                             data-unidade="${unidade}"
                             data-embalagem="${embalagemItem}"
                             data-sem-sistema="false"
-                        >
+                        ><span class="unidade-contagem">${unidade}</span>
                     </td>
                 </tr>`;
 
           }).join("")
 
-        : `<tr><td colspan="4">Sem endereço cadastrado</td></tr>`;
+        : `<tr><td colspan="3">Sem endereço cadastrado</td></tr>`;
 
         const enderecosHtml = `
         <table class="enderecos">
@@ -2855,7 +2862,6 @@ h1{
                 <tr>
                     <th>Endereço</th>
                     <th>Tipo</th>
-                    <th class="centro">Qtd. Sistema</th>
                     <th class="centro">Qtd. Encontrada</th>
                 </tr>
             </thead>
