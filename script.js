@@ -170,6 +170,303 @@ const PAVILHOES = [
 
 ];
 
+// =====================================
+// DEPÓSITOS
+// =====================================
+// O depósito de cada posição vem da Posição de Endereços
+// (coluna detectada a cada processamento). A lista de
+// depósitos e as ruas de cada um saem do próprio arquivo:
+// depósito novo aparece sozinho no filtro.
+
+// Nome amigável (opcional) de cada depósito.
+const NOMES_DEPOSITO = {
+    "4": "Perecível"
+};
+
+// Depósitos que NÃO seguem os intervalos de rua de
+// PAVILHOES (têm numeração própria). As posições deles
+// ficam sem pavilhão, e o filtro de Pavilhão não as esconde.
+const DEPOSITOS_SEM_PAVILHAO = ["4"];
+
+function nomeDeposito(codigo){
+
+    if(!codigo) return "Sem depósito informado";
+
+    const nome = NOMES_DEPOSITO[codigo];
+
+    return nome
+    ? `Depósito ${codigo} · ${nome}`
+    : `Depósito ${codigo}`;
+
+}
+
+// Coluna de depósito da Posição de Endereços. null =
+// arquivo sem depósito (tudo cai em "Sem depósito informado").
+let colDepositoPosicoes = null;
+
+const CANDIDATOS_DEPOSITO = [
+    "coddeposito","nrodeposito","seqdeposito","deposito","depósito","cod_deposito","nro_deposito"
+];
+
+function lerDepositoPosicao(p){
+
+    if(!colDepositoPosicoes || !p) return "";
+
+    return String(p[colDepositoPosicoes] ?? "")
+    .trim()
+    .replace(/^0+(?=\d)/, "");
+
+}
+
+function depositoTemPavilhao(deposito){
+
+    return !DEPOSITOS_SEM_PAVILHAO.includes(deposito);
+
+}
+
+// Pavilhão de UMA posição: só para depósitos que seguem
+// os intervalos de PAVILHOES. Depósito 4 → sem pavilhão (null).
+function obterPavilhaoPosicao(p){
+
+    if(!p) return "Sem Pavilhão";
+
+    if(!depositoTemPavilhao(lerDepositoPosicao(p))) return null;
+
+    return obterPavilhao(p.CODRUA);
+
+}
+
+// Chave do filtro de rua: "DEPÓSITO|RUA" — a mesma numeração
+// de rua em depósitos diferentes não se mistura. Antes de
+// processar, o depósito é "?" (lista fixa).
+function chaveRuaFiltro(deposito, rua){
+
+    return `${deposito}|${extrairRua(String(rua ?? ""))}`;
+
+}
+
+// Ruas reais por depósito → pavilhão, montadas da Posição de
+// Endereços a cada processamento:
+// Map(deposito → Map(pavilhao|null → Set(rua))).
+// null = ainda não processou (usa a lista fixa de PAVILHOES).
+let ruasPorDepositoPosicoes = null;
+
+// =====================================
+// FILTRO DE DEPÓSITO
+// =====================================
+
+function popularFiltroDeposito(){
+
+    const opcoes =
+    document.getElementById("filtroDepositoOpcoes");
+
+    if(!opcoes) return;
+
+    if(!ruasPorDepositoPosicoes){
+
+        opcoes.innerHTML =
+        `<p class="ic-aviso-vazio">Processe os arquivos para listar os depósitos.</p>`;
+
+        atualizarLabelDeposito();
+
+        return;
+
+    }
+
+    const itensAntes =
+    Array.from(document.querySelectorAll(".filtroDepositoItem"));
+
+    const marcadosAntes =
+    new Set(itensAntes.filter(c=> c.checked).map(c=> c.value));
+
+    const estavamTodos =
+    !itensAntes.length || marcadosAntes.size === itensAntes.length;
+
+    const depositos =
+    Array.from(ruasPorDepositoPosicoes.keys())
+    .sort((a,b)=>
+        (a === "") - (b === "") ||
+        a.localeCompare(b, "pt-BR", {numeric:true})
+    );
+
+    let html = `
+    <label class="filtro-pavilhao-item filtro-pavilhao-todos">
+        <input
+            type="checkbox"
+            id="filtroDepositoTodos"
+            onchange="alternarTodosDepositos(this)">
+        Todos os Depósitos
+    </label>
+    <div class="filtro-pavilhao-separador"></div>
+    `;
+
+    depositos.forEach(codigo=>{
+
+        const marcado =
+        estavamTodos || marcadosAntes.has(codigo);
+
+        html += `
+        <label class="filtro-pavilhao-item">
+            <input
+                type="checkbox"
+                class="filtroDepositoItem"
+                value="${codigo}"
+                ${marcado ? "checked" : ""}
+                onchange="atualizarSelecaoDepositos()">
+            ${nomeDeposito(codigo)}
+        </label>
+        `;
+
+    });
+
+    opcoes.innerHTML = html;
+
+    sincronizarTodosDeposito();
+    atualizarLabelDeposito();
+
+}
+
+function toggleDepositoDropdown(){
+
+    const opcoes =
+    document.getElementById("filtroDepositoOpcoes");
+
+    if(!opcoes) return;
+
+    opcoes.style.display =
+    opcoes.style.display === "none"
+    ? "block"
+    : "none";
+
+}
+
+document.addEventListener("click", function(e){
+
+    const container =
+    document.getElementById("filtroDepositoMulti");
+
+    const opcoes =
+    document.getElementById("filtroDepositoOpcoes");
+
+    if(container && opcoes && !container.contains(e.target)){
+
+        opcoes.style.display = "none";
+
+    }
+
+});
+
+function alternarTodosDepositos(chkTodos){
+
+    document
+    .querySelectorAll(".filtroDepositoItem")
+    .forEach(chk=>{
+
+        chk.checked = chkTodos.checked;
+
+    });
+
+    aoMudarDeposito();
+
+}
+
+function atualizarSelecaoDepositos(){
+
+    sincronizarTodosDeposito();
+    aoMudarDeposito();
+
+}
+
+function sincronizarTodosDeposito(){
+
+    const chkTodos =
+    document.getElementById("filtroDepositoTodos");
+
+    if(!chkTodos) return;
+
+    chkTodos.checked =
+    Array.from(document.querySelectorAll(".filtroDepositoItem"))
+    .every(chk => chk.checked);
+
+}
+
+function aoMudarDeposito(){
+
+    atualizarLabelDeposito();
+
+    popularFiltroRua();
+
+    if(typeof aplicarFiltros === "function"){
+
+        aplicarFiltros();
+
+    }
+
+}
+
+function atualizarLabelDeposito(){
+
+    const label =
+    document.getElementById("filtroDepositoLabel");
+
+    if(!label) return;
+
+    const itens =
+    Array.from(document.querySelectorAll(".filtroDepositoItem"));
+
+    if(!itens.length){
+
+        label.innerText = "Todos os Depósitos";
+
+        return;
+
+    }
+
+    const marcados =
+    itens.filter(chk => chk.checked);
+
+    if(marcados.length === 0){
+
+        label.innerText = "Nenhum Depósito";
+
+    }
+    else if(marcados.length === itens.length){
+
+        label.innerText = "Todos os Depósitos";
+
+    }
+    else if(marcados.length === 1){
+
+        label.innerText = nomeDeposito(marcados[0].value);
+
+    }
+    else{
+
+        label.innerText =
+        "Depósitos " + marcados.map(chk => chk.value || "—").join(", ");
+
+    }
+
+}
+
+// null = sem filtro (todos marcados ou ainda não processou);
+// Set = depósitos marcados (vazio = nenhum passa).
+function obterDepositosFiltroAtual(){
+
+    const itens =
+    Array.from(document.querySelectorAll(".filtroDepositoItem"));
+
+    if(!itens.length) return null;
+
+    const marcados =
+    itens.filter(chk => chk.checked);
+
+    if(marcados.length === itens.length) return null;
+
+    return new Set(marcados.map(chk => chk.value));
+
+}
+
 function obterPavilhao(rua){
 
     const r = Number(rua) || 0;
@@ -300,6 +597,8 @@ function alternarTodosPavilhoes(chkTodos){
 
     atualizarLabelPavilhao();
 
+    popularFiltroRua();
+
     if(typeof aplicarFiltros === "function"){
 
         aplicarFiltros();
@@ -327,6 +626,8 @@ function atualizarSelecaoPavilhoes(){
     }
 
     atualizarLabelPavilhao();
+
+    popularFiltroRua();
 
     if(typeof aplicarFiltros === "function"){
 
@@ -497,7 +798,7 @@ function atualizarLabelRua(){
 
         label.innerText =
         marcados
-        .map(chk => `Rua ${chk.value}`)
+        .map(chk => `Rua ${chk.dataset.rua}`)
         .join(", ");
 
     }
@@ -534,7 +835,30 @@ function obterRuasFiltroAtual(){
 
     }
 
-    return marcados.map(chk => Number(chk.value));
+    // chaves "PAVILHÃO|RUA" (ver chaveRuaFiltro)
+    return marcados.map(chk => chk.value);
+
+}
+
+// Ruas marcadas só pra exibir (relatório / filtros ativos)
+function obterRotulosRuasFiltroAtual(){
+
+    const itens =
+    Array.from(document.querySelectorAll(".filtroRuaItem"));
+
+    const marcados =
+    itens.filter(chk => chk.checked);
+
+    if(!itens.length || marcados.length === itens.length) return [];
+
+    const variosDepositos =
+    new Set(itens.map(chk => chk.dataset.deposito)).size > 1;
+
+    return marcados.map(chk =>
+        variosDepositos && chk.dataset.deposito && chk.dataset.deposito !== "?"
+        ? `${chk.dataset.rua} (Dep. ${chk.dataset.deposito})`
+        : chk.dataset.rua
+    );
 
 }
 
@@ -1082,6 +1406,46 @@ function gerarComparativo(){
 
     const mapaPulmoes = Object.create(null);
 
+    // Depósito — mesma Posição de Endereços
+    colDepositoPosicoes =
+    detectarColuna(dadosPosicoes[0], CANDIDATOS_DEPOSITO);
+
+    if(!colDepositoPosicoes && dadosPosicoes.length){
+
+        console.warn(
+            "Posição de Endereços sem coluna de depósito — o filtro de Depósito fica só com \"Sem depósito informado\". Colunas disponíveis:",
+            Object.keys(dadosPosicoes[0])
+        );
+
+    }
+
+    // ruas reais de cada depósito → pavilhão (apanha + pulmão)
+    ruasPorDepositoPosicoes = new Map();
+
+    dadosPosicoes.forEach(p=>{
+
+        const rua = String(p.CODRUA ?? "").trim();
+
+        if(!rua) return;
+
+        const dep = lerDepositoPosicao(p);
+
+        const pav = obterPavilhaoPosicao(p);
+
+        if(!ruasPorDepositoPosicoes.has(dep)){
+
+            ruasPorDepositoPosicoes.set(dep, new Map());
+
+        }
+
+        const porPav = ruasPorDepositoPosicoes.get(dep);
+
+        if(!porPav.has(pav)) porPav.set(pav, new Set());
+
+        porPav.get(pav).add(extrairRua(rua));
+
+    });
+
     // SEQENDEREÇO: mesma Posição de Endereços,
     // só mais uma coluna lida
     const colSeqEndereco =
@@ -1179,6 +1543,12 @@ function gerarComparativo(){
             endereco:
             `${p.CODRUA}.${p.NROPREDIO}.${p.NROAPARTAMENTO}.${p.NROSALA}`,
 
+            deposito:
+            lerDepositoPosicao(p),
+
+            pavilhao:
+            obterPavilhaoPosicao(p),
+
             quantidade:
             Number(p.QTD_END || 0),
 
@@ -1247,8 +1617,11 @@ function gerarComparativo(){
 
             quantidadeApanha,
 
+            depositoApanha:
+            lerDepositoPosicao(posicaoApanha),
+
             pavilhao:
-            obterPavilhao(posicaoApanha?.CODRUA),
+            obterPavilhaoPosicao(posicaoApanha),
 
             pulmoes,
 
@@ -1287,6 +1660,13 @@ function gerarComparativo(){
     }
     catch(erro){
         console.error("Falha em atualizarKPIs():", erro);
+    }
+
+    try{
+        popularFiltroDeposito();
+    }
+    catch(erro){
+        console.error("Falha em popularFiltroDeposito():", erro);
     }
 
     try{
@@ -1752,15 +2132,13 @@ function extrairRua(endereco){
 
 }
 
-// monta o dropdown de ruas (checkboxes) com base
-// nas ruas oficialmente cadastradas em cada pavilhão
-// (mesma referência oficial de Pavilhão_1.txt,
-// Pavilhão_2.txt, Pavilhão_3.txt e Perecível.txt —
-// os intervalos abaixo batem exatamente com as ruas
-// que aparecem nesses arquivos), agrupadas por
-// pavilhão. Como é uma lista fixa, as ruas aparecem
-// sempre, mesmo antes de processar qualquer
-// comparativo.
+// monta o dropdown de ruas (checkboxes), mostrando SÓ as
+// ruas dos depósitos marcados no filtro de Depósito (e dos
+// pavilhões marcados, para os depósitos que têm pavilhão).
+// - Antes de processar: lista fixa de PAVILHOES (mesma
+//   referência oficial de Pavilhão_1/2/3 e Perecível).
+// - Depois de processar: ruas reais da Posição de
+//   Endereços, agrupadas por depósito (e pavilhão).
 
 function popularFiltroRua(){
 
@@ -1769,67 +2147,174 @@ function popularFiltroRua(){
 
     if(!opcoes) return;
 
-    // preserva a seleção atual (se já existir) antes
-    // de reconstruir a lista de checkboxes
+    const itensAntes =
+    Array.from(document.querySelectorAll(".filtroRuaItem"));
 
     const marcadasAntes =
+    new Set(itensAntes.filter(c=> c.checked).map(c=> c.value));
+
+    // seleção feita na lista fixa ("?|rua") vale pra rua
+    // de mesmo número em qualquer depósito
+    const ruasMarcadasSemDeposito =
     new Set(
-        Array.from(
-            document.querySelectorAll(".filtroRuaItem")
-        )
-        .filter(chk => chk.checked)
-        .map(chk => chk.value)
+        itensAntes
+        .filter(c=> c.checked && c.dataset.deposito === "?")
+        .map(c=> c.dataset.rua)
     );
 
-    const haviaSelecaoAnterior =
-    document.querySelectorAll(".filtroRuaItem").length > 0;
+    const estavamTodas =
+    !itensAntes.length || marcadasAntes.size === itensAntes.length;
+
+    const itensPav =
+    Array.from(document.querySelectorAll(".filtroPavilhaoItem"));
+
+    const pavilhoesVisiveis =
+    itensPav.length
+    ? new Set(itensPav.filter(c=> c.checked).map(c=> c.value))
+    : null;
+
+    const nomesPavilhao =
+    PAVILHOES.map(p => p.nome).concat(["Sem Pavilhão"]);
+
+    const ordemRua = (x,y)=>
+    String(x).localeCompare(String(y), "pt-BR", {numeric:true});
+
+    // grupos: [{titulo, deposito, ruas:[...]}]
+    const grupos = [];
+
+    if(!ruasPorDepositoPosicoes){
+
+        nomesPavilhao.forEach(nome=>{
+
+            if(pavilhoesVisiveis && !pavilhoesVisiveis.has(nome)) return;
+
+            const pav = PAVILHOES.find(p => p.nome === nome);
+
+            const ruas = [];
+
+            (pav?.ruas || []).forEach(([ruaInicio, ruaFim])=>{
+
+                for(let r = ruaInicio; r <= ruaFim; r++) ruas.push(r);
+
+            });
+
+            if(ruas.length) grupos.push({titulo:nome, deposito:"?", ruas});
+
+        });
+
+    }
+    else{
+
+        const depositosFiltro =
+        obterDepositosFiltroAtual();
+
+        const depositos =
+        Array.from(ruasPorDepositoPosicoes.keys())
+        .filter(d=> !depositosFiltro || depositosFiltro.has(d))
+        .sort((a,b)=> (a === "") - (b === "") || ordemRua(a,b));
+
+        const variosDepositos =
+        ruasPorDepositoPosicoes.size > 1;
+
+        depositos.forEach(dep=>{
+
+            const porPav = ruasPorDepositoPosicoes.get(dep);
+
+            if(!depositoTemPavilhao(dep)){
+
+                const ruas = Array.from(porPav.get(null) || []).sort(ordemRua);
+
+                if(ruas.length) grupos.push({titulo:nomeDeposito(dep), deposito:dep, ruas});
+
+                return;
+
+            }
+
+            nomesPavilhao.forEach(nome=>{
+
+                if(pavilhoesVisiveis && !pavilhoesVisiveis.has(nome)) return;
+
+                const ruas = Array.from(porPav.get(nome) || []).sort(ordemRua);
+
+                if(!ruas.length) return;
+
+                grupos.push({
+                    titulo: variosDepositos ? `${nomeDeposito(dep)} · ${nome}` : nome,
+                    deposito: dep,
+                    ruas
+                });
+
+            });
+
+        });
+
+    }
+
+    if(!grupos.length){
+
+        const depositosFiltro = obterDepositosFiltroAtual();
+
+        opcoes.innerHTML =
+        `<p class="ic-aviso-vazio">${
+            depositosFiltro && !depositosFiltro.size
+            ? "Selecione ao menos um depósito para listar as ruas."
+            : "Nenhuma rua encontrada para o(s) depósito(s) e pavilhão(ões) selecionado(s)."
+        }</p>`;
+
+        atualizarLabelRua();
+
+        return;
+
+    }
+
+    const todasChaves =
+    grupos.flatMap(g => g.ruas.map(r => chaveRuaFiltro(g.deposito, r)));
+
+    const algumaMantida =
+    todasChaves.some(k => marcadasAntes.has(k)) ||
+    grupos.some(g => g.ruas.some(r => ruasMarcadasSemDeposito.has(String(r).padStart(3,"0"))));
+
+    const marcarTodas =
+    estavamTodas || !algumaMantida;
 
     let html = `
     <label class="filtro-pavilhao-item filtro-pavilhao-todos">
         <input
             type="checkbox"
             id="filtroRuaTodos"
-            checked
             onchange="alternarTodasRuas(this)">
         Todas as Ruas
     </label>
     <div class="filtro-pavilhao-separador"></div>
     `;
 
-    PAVILHOES.forEach(pav=>{
+    grupos.forEach(({titulo, deposito, ruas})=>{
 
-        const ruasDoPavilhao = [];
+        html += `<div class="filtro-rua-grupo-titulo">${titulo}</div>`;
 
-        pav.ruas.forEach(([ruaInicio, ruaFim])=>{
+        ruas.forEach(rua=>{
 
-            for(let r = ruaInicio; r <= ruaFim; r++){
+            const chave = chaveRuaFiltro(deposito, rua);
 
-                ruasDoPavilhao.push(r);
-
-            }
-
-        });
-
-        html += `<div class="filtro-rua-grupo-titulo">${pav.nome}</div>`;
-
-        ruasDoPavilhao.forEach(rua=>{
-
-            const valor =
+            const rotulo =
             String(rua).padStart(3,"0");
 
             const marcado =
-            !haviaSelecaoAnterior ||
-            marcadasAntes.has(valor);
+            marcarTodas ||
+            marcadasAntes.has(chave) ||
+            ruasMarcadasSemDeposito.has(rotulo);
 
             html += `
             <label class="filtro-pavilhao-item">
                 <input
                     type="checkbox"
                     class="filtroRuaItem"
-                    value="${valor}"
+                    value="${chave}"
+                    data-rua="${rotulo}"
+                    data-deposito="${deposito}"
                     ${marcado ? "checked" : ""}
                     onchange="atualizarSelecaoRuas()">
-                Rua ${valor}
+                Rua ${rotulo}
             </label>
             `;
 
@@ -1838,6 +2323,17 @@ function popularFiltroRua(){
     });
 
     opcoes.innerHTML = html;
+
+    const chkTodos =
+    document.getElementById("filtroRuaTodos");
+
+    if(chkTodos){
+
+        chkTodos.checked =
+        Array.from(document.querySelectorAll(".filtroRuaItem"))
+        .every(chk => chk.checked);
+
+    }
 
     atualizarLabelRua();
 
@@ -2106,6 +2602,9 @@ function obterFiltrado(){
     const pavilhoesFiltro =
     obterPavilhoesFiltroAtual();
 
+    const depositosFiltro =
+    obterDepositosFiltroAtual();
+
     const formaFiltro =
     document
     .getElementById("filtroFormaAbast")
@@ -2146,11 +2645,26 @@ function obterFiltrado(){
 
             (tipoValor === "perda" && temValor && item.valorDivergencia < 0);
 
+        // item de depósito sem pavilhão (ex.: depósito 4)
+        // não é escondido pelo filtro de Pavilhão
         const pavilhaoOk =
 
             !pavilhoesFiltro.length ||
 
+            item.pavilhao === null ||
+
             pavilhoesFiltro.includes(item.pavilhao);
+
+        // depósito: bate se a apanha OU qualquer pulmão
+        // do item estiver num depósito marcado
+
+        const depositoOk =
+
+            !depositosFiltro ||
+
+            (item.enderecoApanha && depositosFiltro.has(item.depositoApanha)) ||
+
+            item.pulmoes.some(p=> depositosFiltro.has(p.deposito));
 
         // rua: bate se a rua da apanha OU a rua de
         // qualquer pulmão do item corresponder ao filtro
@@ -2163,10 +2677,11 @@ function obterFiltrado(){
 
             !ruasFiltro.length ||
 
-            ruasFiltro.includes(extrairRua(item.enderecoApanha)) ||
+            (item.enderecoApanha &&
+             ruasFiltro.includes(chaveRuaFiltro(item.depositoApanha, item.enderecoApanha))) ||
 
             item.pulmoes.some(p=>
-                ruasFiltro.includes(extrairRua(p.endereco))
+                ruasFiltro.includes(chaveRuaFiltro(p.deposito, p.endereco))
             );
 
         // forma de abastecimento (só filtra se o arquivo foi carregado)
@@ -2183,7 +2698,7 @@ function obterFiltrado(){
 
             (regForma && regForma.tipo === formaFiltro);
 
-        return skuOk && qtdOk && valorOk && pavilhaoOk && ruaOk && formaOk;
+        return skuOk && qtdOk && valorOk && pavilhaoOk && depositoOk && ruaOk && formaOk;
 
     });
 
@@ -3474,16 +3989,12 @@ function obterResumoFiltrosAtivos(){
 
     }
 
-    const ruasFiltro =
-    obterRuasFiltroAtual();
+    const ruasRotulos =
+    obterRotulosRuasFiltroAtual();
 
-    if(ruasFiltro.length){
+    if(ruasRotulos.length){
 
-        partes.push(
-            `Rua: ${ruasFiltro
-                .map(r => String(r).padStart(3,"0"))
-                .join(", ")}`
-        );
+        partes.push(`Rua: ${ruasRotulos.join(", ")}`);
 
     }
 
@@ -3517,6 +4028,17 @@ function obterResumoFiltrosAtivos(){
         };
 
         partes.push(nomesForma[formaFiltro] || formaFiltro);
+
+    }
+
+    const depositosResumo =
+    obterDepositosFiltroAtual();
+
+    if(depositosResumo){
+
+        partes.push(
+            `Depósito: ${Array.from(depositosResumo).map(nomeDeposito).join(", ")}`
+        );
 
     }
 

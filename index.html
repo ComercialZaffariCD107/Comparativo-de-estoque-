@@ -488,6 +488,28 @@
                     min="0"
                     placeholder="Nº exato de pulmões (ex: 2)">
 
+                <div class="filtro-pavilhao-multi" id="filtroDepositoMulti">
+
+                    <button
+                        type="button"
+                        class="filtro-pavilhao-btn"
+                        id="filtroDepositoBtn"
+                        onclick="toggleDepositoDropdown()">
+
+                        <span id="filtroDepositoLabel">Todos os Depósitos</span>
+                        <span class="filtro-pavilhao-seta">▾</span>
+
+                    </button>
+
+                    <div
+                        class="filtro-pavilhao-opcoes"
+                        id="filtroDepositoOpcoes"
+                        style="display:none;">
+                        <p class="ic-aviso-vazio">Processe os arquivos para listar os depósitos.</p>
+                    </div>
+
+                </div>
+
                 <div class="filtro-pavilhao-multi" id="filtroRuaMulti">
 
                     <button
@@ -912,14 +934,40 @@
             <div class="card">
 
                 <h2>
-                    Filtro de Rua
+                    Filtro de Depósito e Rua
                 </h2>
 
                 <p class="aviso-inventario">
-                    Selecione a(s) rua(s) para puxar os endereços de picking e de pulmão correspondentes.
+                    Selecione o(s) depósito(s) e depois a(s) rua(s). A lista de ruas mostra só as ruas que as consultas 34 (Estoque Pulmão) e 25 (Ruas Fixas) trazem para os depósitos marcados.
                 </p>
 
                 <div class="filtros">
+
+                    <div class="filtro-pavilhao-multi" id="icFiltroDepositoMulti">
+
+                        <button
+                            type="button"
+                            class="filtro-pavilhao-btn"
+                            id="icFiltroDepositoBtn"
+                            onclick="icToggleDepositoDropdown()">
+
+                            <span id="icFiltroDepositoLabel">Processe os arquivos primeiro</span>
+                            <span class="filtro-pavilhao-seta">▾</span>
+
+                        </button>
+
+                        <div
+                            class="filtro-pavilhao-opcoes"
+                            id="icFiltroDepositoOpcoes"
+                            style="display:none;">
+
+                            <p class="ic-aviso-vazio">
+                                Processe os arquivos para listar os depósitos.
+                            </p>
+
+                        </div>
+
+                    </div>
 
                     <div class="filtro-pavilhao-multi" id="icFiltroRuaMulti">
 
@@ -1057,8 +1105,8 @@
 
     </div>
 
-<script src="script.js?v=14"></script>
-<script src="inventario.js?v=14"></script>
+<script src="script.js?v=16"></script>
+<script src="inventario.js?v=16"></script>
 <script src="sync.js?v=14"></script>
 
 </body>

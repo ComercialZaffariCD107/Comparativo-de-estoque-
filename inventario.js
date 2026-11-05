@@ -26,7 +26,8 @@
 //     Regra: Interno pelo CD  -> "Interno CD"     = Inversa
 //            Compra Entrega   -> "Compra Entrega" = Depósito
 //
-// Fluxo: seleciona rua(s) -> imprime folha de contagem
+// Fluxo: seleciona depósito(s) -> rua(s) daquele(s)
+// depósito(s) -> imprime folha de contagem
 // em branco (sem valores do sistema pra conferir, só
 // endereço + produto esperado) pra picking OU pulmão.
 // =====================================================
@@ -34,7 +35,35 @@
 
 let icDadosPulmao = [];
 let icDadosRuasFixas = [];
-let icRuasDisponiveis = []; // [{codigo:"105", pavilhao:"Pavilhão 2"}, ...]
+let icRuasDisponiveis = []; // [{chave:"4|26", deposito:"4", codigo:"26", pavilhao:"Perecível"}, ...]
+let icDepositosDisponiveis = []; // ["1","2","3","4"]
+
+// Nome de exibição de cada depósito. A LISTA de depósitos e de
+// ruas de cada um NÃO é fixa: sai sempre das consultas 34
+// (Estoque Pulmão, coluna CODDEPOSITO) e 25 (Ruas Fixas, 1º
+// pedaço do ENDER). Depósito novo aparece sozinho no filtro;
+// aqui só se dá um nome amigável a ele (opcional).
+const IC_NOMES_DEPOSITO = {
+    "4": "Perecível"
+};
+
+function icNomeDeposito(codigo){
+
+    if(!codigo) return "Sem depósito";
+
+    const nome = IC_NOMES_DEPOSITO[codigo];
+
+    return nome
+    ? `Depósito ${codigo} · ${nome}`
+    : `Depósito ${codigo}`;
+
+}
+
+function icChaveRua(deposito, rua){
+
+    return `${deposito}|${rua}`;
+
+}
 
 // Mapa SKU -> { dun:[{cod,qtd}], ean:[{cod,qtd}] } (opcional).
 // Vem do TXT "Dun e Ean" (SEQPRODUTO;DESCCOMPLETA;QTDEMBALAGEM;
@@ -304,6 +333,7 @@ async function icProcessar(){
         );
 
         icMontarListaDeRuas();
+        icPopularFiltroDeposito();
         icPopularFiltroRua();
         icAtualizarResumo();
 
@@ -334,6 +364,9 @@ function icNormalizarPulmao(linhas){
 
     if(!linhas.length) return [];
 
+    const colDeposito =
+    detectarColuna(linhas[0], ["coddeposito","deposito","depósito"]);
+
     const colRua =
     detectarColuna(linhas[0], ["codrua"]);
 
@@ -358,6 +391,15 @@ function icNormalizarPulmao(linhas){
     const colStatus =
     detectarColuna(linhas[0], ["status"]);
 
+    if(!colDeposito){
+
+        console.warn(
+            "Consulta 34 (Estoque Pulmão) sem coluna CODDEPOSITO — os pulmões ficam como \"Sem depósito\". Colunas:",
+            Object.keys(linhas[0])
+        );
+
+    }
+
     if(!colRua){
 
         alert(
@@ -372,6 +414,8 @@ function icNormalizarPulmao(linhas){
 
     return linhas
     .map(l=>({
+
+        deposito: icChaveSku(colDeposito ? l[colDeposito] : ""),
 
         rua: String(l[colRua] ?? "").trim(),
 
@@ -444,6 +488,8 @@ function icNormalizarRuasFixas(linhas){
         const partes = enderecoBruto.split(".");
 
         return {
+
+            deposito: icChaveSku(partes[0] ?? ""),
 
             rua: (partes[1] ?? "").trim(),
 
@@ -689,21 +735,283 @@ function icCelulaDescricao(sku, descricao){
 
 function icMontarListaDeRuas(){
 
-    const codigos = new Set();
+    const depositos = new Set();
+    const ruas = new Map();
 
-    icDadosPulmao.forEach(l=> codigos.add(l.rua));
-    icDadosRuasFixas.forEach(l=> codigos.add(l.rua));
+    [...icDadosPulmao, ...icDadosRuasFixas].forEach(l=>{
+
+        depositos.add(l.deposito);
+
+        const chave = icChaveRua(l.deposito, l.rua);
+
+        if(!ruas.has(chave)){
+
+            ruas.set(chave, {
+                chave,
+                deposito: l.deposito,
+                codigo: l.rua,
+                pavilhao: obterPavilhao(l.rua)
+            });
+
+        }
+
+    });
+
+    const ordem = (a,b)=>
+    String(a).localeCompare(String(b), "pt-BR", {numeric:true});
+
+    // "Sem depósito" (código vazio) vai pro fim
+    icDepositosDisponiveis =
+    Array.from(depositos)
+    .sort((a,b)=>
+        (a === "") - (b === "") || ordem(a,b)
+    );
 
     icRuasDisponiveis =
-    Array.from(codigos)
-    .filter(c=> c !== "")
+    Array.from(ruas.values())
     .sort((a,b)=>
-        a.localeCompare(b, "pt-BR", {numeric:true})
-    )
-    .map(codigo=>({
-        codigo,
-        pavilhao: obterPavilhao(codigo)
-    }));
+        (a.deposito === "") - (b.deposito === "") ||
+        ordem(a.deposito, b.deposito) ||
+        ordem(a.codigo, b.codigo)
+    );
+
+}
+
+// =====================================
+// FILTRO DE DEPÓSITO (mesmo componente
+// do filtro de rua). Ao mudar, a lista de
+// ruas é refeita só com as ruas que as
+// consultas 34/25 trazem para os depósitos
+// marcados.
+// =====================================
+
+function icPopularFiltroDeposito(){
+
+    const opcoes =
+    document.getElementById("icFiltroDepositoOpcoes");
+
+    if(!opcoes) return;
+
+    if(!icDepositosDisponiveis.length){
+
+        opcoes.innerHTML =
+        `<p class="ic-aviso-vazio">Nenhum depósito encontrado nos arquivos carregados.</p>`;
+
+        icAtualizarLabelDeposito();
+
+        return;
+
+    }
+
+    const itensAntes =
+    Array.from(document.querySelectorAll(".icFiltroDepositoItem"));
+
+    const marcadosAntes =
+    new Set(itensAntes.filter(c=> c.checked).map(c=> c.value));
+
+    const estavamTodos =
+    !itensAntes.length || marcadosAntes.size === itensAntes.length;
+
+    let html = `
+    <label class="filtro-pavilhao-item filtro-pavilhao-todos">
+        <input
+            type="checkbox"
+            id="icFiltroDepositoTodos"
+            onchange="icAlternarTodosDepositos(this)">
+        Todos os Depósitos
+    </label>
+    <div class="filtro-pavilhao-separador"></div>
+    `;
+
+    icDepositosDisponiveis.forEach(codigo=>{
+
+        const marcado =
+        estavamTodos || marcadosAntes.has(codigo);
+
+        html += `
+        <label class="filtro-pavilhao-item">
+            <input
+                type="checkbox"
+                class="icFiltroDepositoItem"
+                value="${codigo}"
+                ${marcado ? "checked" : ""}
+                onchange="icAtualizarSelecaoDepositos()">
+            ${icNomeDeposito(codigo)}
+        </label>
+        `;
+
+    });
+
+    opcoes.innerHTML = html;
+
+    icSincronizarTodosDeposito();
+    icAtualizarLabelDeposito();
+
+}
+
+function icToggleDepositoDropdown(){
+
+    const opcoes =
+    document.getElementById("icFiltroDepositoOpcoes");
+
+    if(!opcoes) return;
+
+    opcoes.style.display =
+    opcoes.style.display === "none"
+    ? "block"
+    : "none";
+
+}
+
+document.addEventListener("click", function(e){
+
+    const container =
+    document.getElementById("icFiltroDepositoMulti");
+
+    const opcoes =
+    document.getElementById("icFiltroDepositoOpcoes");
+
+    if(container && opcoes && !container.contains(e.target)){
+
+        opcoes.style.display = "none";
+
+    }
+
+});
+
+function icAlternarTodosDepositos(chkTodos){
+
+    document
+    .querySelectorAll(".icFiltroDepositoItem")
+    .forEach(chk=>{
+
+        chk.checked = chkTodos.checked;
+
+    });
+
+    icAoMudarDeposito();
+
+}
+
+function icAtualizarSelecaoDepositos(){
+
+    icSincronizarTodosDeposito();
+    icAoMudarDeposito();
+
+}
+
+function icSincronizarTodosDeposito(){
+
+    const chkTodos =
+    document.getElementById("icFiltroDepositoTodos");
+
+    if(!chkTodos) return;
+
+    chkTodos.checked =
+    Array.from(document.querySelectorAll(".icFiltroDepositoItem"))
+    .every(chk => chk.checked);
+
+}
+
+function icAoMudarDeposito(){
+
+    icAtualizarLabelDeposito();
+    icPopularFiltroRua();
+    icAtualizarResumo();
+
+}
+
+function icAtualizarLabelDeposito(){
+
+    const label =
+    document.getElementById("icFiltroDepositoLabel");
+
+    if(!label) return;
+
+    const itens =
+    Array.from(document.querySelectorAll(".icFiltroDepositoItem"));
+
+    if(!itens.length){
+
+        label.innerText = "Processe os arquivos primeiro";
+
+        return;
+
+    }
+
+    const marcados =
+    itens.filter(chk => chk.checked);
+
+    if(marcados.length === 0){
+
+        label.innerText = "Nenhum Depósito";
+
+    }
+    else if(marcados.length === itens.length){
+
+        label.innerText = "Todos os Depósitos";
+
+    }
+    else if(marcados.length === 1){
+
+        label.innerText = icNomeDeposito(marcados[0].value);
+
+    }
+    else{
+
+        label.innerText =
+        "Depósitos " + marcados.map(chk => chk.value || "—").join(", ");
+
+    }
+
+}
+
+// Sempre devolve a lista dos depósitos marcados
+// (vazia = nenhum marcado = nada passa).
+function icObterDepositosFiltroAtual(){
+
+    const itens =
+    Array.from(document.querySelectorAll(".icFiltroDepositoItem"));
+
+    if(!itens.length){
+
+        return icDepositosDisponiveis.slice();
+
+    }
+
+    return itens
+    .filter(chk => chk.checked)
+    .map(chk => chk.value);
+
+}
+
+function icRuasDoFiltroDeposito(){
+
+    const depositos =
+    new Set(icObterDepositosFiltroAtual());
+
+    return icRuasDisponiveis
+    .filter(r=> depositos.has(r.deposito));
+
+}
+
+function icResumoDepositosSelecionados(){
+
+    const itens =
+    Array.from(document.querySelectorAll(".icFiltroDepositoItem"));
+
+    if(!itens.length) return "—";
+
+    const marcados =
+    itens.filter(chk => chk.checked);
+
+    if(!marcados.length) return "Nenhum depósito selecionado";
+
+    if(marcados.length === itens.length) return "Todos os depósitos";
+
+    return marcados
+    .map(chk => icNomeDeposito(chk.value))
+    .join(", ");
 
 }
 
@@ -720,10 +1028,15 @@ function icPopularFiltroRua(){
 
     if(!opcoes) return;
 
-    if(!icRuasDisponiveis.length){
+    const ruasVisiveis =
+    icRuasDoFiltroDeposito();
+
+    if(!ruasVisiveis.length){
 
         opcoes.innerHTML =
-        `<p class="ic-aviso-vazio">Nenhuma rua encontrada nos arquivos carregados.</p>`;
+        icRuasDisponiveis.length
+        ? `<p class="ic-aviso-vazio">Selecione ao menos um depósito para listar as ruas.</p>`
+        : `<p class="ic-aviso-vazio">Nenhuma rua encontrada nos arquivos carregados.</p>`;
 
         icAtualizarLabelRua();
 
@@ -731,52 +1044,68 @@ function icPopularFiltroRua(){
 
     }
 
-    const marcadasAntes =
-    new Set(
-        Array.from(
-            document.querySelectorAll(".icFiltroRuaItem")
-        )
-        .filter(chk => chk.checked)
-        .map(chk => chk.value)
-    );
+    // Mantém a seleção de rua ao trocar de depósito: se
+    // estavam todas marcadas, as ruas novas também entram
+    // marcadas; se havia uma seleção, ela é mantida.
+    const itensAntes =
+    Array.from(document.querySelectorAll(".icFiltroRuaItem"));
 
-    const haviaSelecaoAnterior =
-    document.querySelectorAll(".icFiltroRuaItem").length > 0;
+    const marcadasAntes =
+    new Set(itensAntes.filter(c=> c.checked).map(c=> c.value));
+
+    const estavamTodas =
+    !itensAntes.length || marcadasAntes.size === itensAntes.length;
+
+    const algumaMantida =
+    ruasVisiveis.some(r=> marcadasAntes.has(r.chave));
+
+    const marcarTodas =
+    estavamTodas || !algumaMantida;
+
+    const variosDepositos =
+    new Set(ruasVisiveis.map(r=> r.deposito)).size > 1;
 
     let html = `
     <label class="filtro-pavilhao-item filtro-pavilhao-todos">
         <input
             type="checkbox"
             id="icFiltroRuaTodos"
-            checked
             onchange="icAlternarTodasRuas(this)">
         Todas as Ruas
     </label>
     <div class="filtro-pavilhao-separador"></div>
     `;
 
-    let pavilhaoAtual = null;
+    let grupoAtual = null;
 
-    icRuasDisponiveis.forEach(({codigo, pavilhao})=>{
+    ruasVisiveis.forEach(({chave, deposito, codigo, pavilhao})=>{
 
-        if(pavilhao !== pavilhaoAtual){
+        // Depósito 4 (perecível) tem ruas próprias: o título
+        // do grupo é o depósito; o pavilhão só entra quando
+        // é um dos depósitos tradicionais.
+        const grupo =
+        variosDepositos
+        ? `${icNomeDeposito(deposito)}${IC_NOMES_DEPOSITO[deposito] ? "" : " · " + pavilhao}`
+        : (IC_NOMES_DEPOSITO[deposito] ? icNomeDeposito(deposito) : pavilhao);
 
-            pavilhaoAtual = pavilhao;
+        if(grupo !== grupoAtual){
 
-            html += `<div class="filtro-rua-grupo-titulo-ic">${pavilhao}</div>`;
+            grupoAtual = grupo;
+
+            html += `<div class="filtro-rua-grupo-titulo-ic">${grupo}</div>`;
 
         }
 
         const marcado =
-        !haviaSelecaoAnterior ||
-        marcadasAntes.has(codigo);
+        marcarTodas || marcadasAntes.has(chave);
 
         html += `
         <label class="filtro-pavilhao-item">
             <input
                 type="checkbox"
                 class="icFiltroRuaItem"
-                value="${codigo}"
+                value="${chave}"
+                data-rua="${codigo}"
                 ${marcado ? "checked" : ""}
                 onchange="icAtualizarSelecaoRuas()">
             Rua ${codigo}
@@ -786,6 +1115,17 @@ function icPopularFiltroRua(){
     });
 
     opcoes.innerHTML = html;
+
+    const chkTodos =
+    document.getElementById("icFiltroRuaTodos");
+
+    if(chkTodos){
+
+        chkTodos.checked =
+        Array.from(document.querySelectorAll(".icFiltroRuaItem"))
+        .every(chk => chk.checked);
+
+    }
 
     icAtualizarLabelRua();
 
@@ -896,7 +1236,7 @@ function icAtualizarLabelRua(){
 
         label.innerText =
         marcados
-        .map(chk => `Rua ${chk.value}`)
+        .map(chk => `Rua ${chk.dataset.rua}`)
         .join(", ");
 
     }
@@ -954,7 +1294,22 @@ function icNumeroOuNaN(valor){
 
 }
 
+function icCompararDeposito(a, b){
+
+    return String(a.deposito ?? "").localeCompare(
+        String(b.deposito ?? ""),
+        "pt-BR",
+        {numeric:true}
+    );
+
+}
+
 function icCompararEndereco(a, b){
+
+    // 0) Depósito
+    const cmpDep = icCompararDeposito(a, b);
+
+    if(cmpDep !== 0) return cmpDep;
 
     // 1) Rua
     const cmpRua = String(a.rua).localeCompare(
@@ -991,6 +1346,11 @@ function icCompararEndereco(a, b){
 // Em cada lado, termina a altura 21/22 em todos os prédios antes de
 // subir para a 31/32, e assim por diante.
 function icCompararEnderecoPulmao(a, b){
+
+    // 0) Depósito
+    const cmpDep = icCompararDeposito(a, b);
+
+    if(cmpDep !== 0) return cmpDep;
 
     // 1) Rua
     const cmpRua = String(a.rua).localeCompare(
@@ -1031,15 +1391,35 @@ function icCompararEnderecoPulmao(a, b){
 
 }
 
+// Depósito + rua. A rua é comparada pela chave
+// "DEPÓSITO|RUA", então a mesma numeração de rua em
+// depósitos diferentes não se mistura.
+function icPassaFiltros(){
+
+    const depositos =
+    new Set(icObterDepositosFiltroAtual());
+
+    // todas as ruas marcadas (ou lista ainda vazia) = sem filtro
+    // de rua; nenhuma marcada = nada passa
+    const itensRua =
+    Array.from(document.querySelectorAll(".icFiltroRuaItem"));
+
+    const semFiltroRua =
+    !itensRua.length || itensRua.every(chk => chk.checked);
+
+    const ruas =
+    new Set(itensRua.filter(chk => chk.checked).map(chk => chk.value));
+
+    return l=>
+        depositos.has(l.deposito) &&
+        (semFiltroRua || ruas.has(icChaveRua(l.deposito, l.rua)));
+
+}
+
 function icFiltrarPickings(){
 
-    const ruasFiltro = icObterRuasFiltroAtual();
-
     return icDadosRuasFixas
-    .filter(l=>
-        !ruasFiltro.length ||
-        ruasFiltro.includes(l.rua)
-    )
+    .filter(icPassaFiltros())
     .slice()
     .sort(icCompararEndereco);
 
@@ -1047,13 +1427,8 @@ function icFiltrarPickings(){
 
 function icFiltrarPulmoes(){
 
-    const ruasFiltro = icObterRuasFiltroAtual();
-
     return icDadosPulmao
-    .filter(l=>
-        !ruasFiltro.length ||
-        ruasFiltro.includes(l.rua)
-    )
+    .filter(icPassaFiltros())
     .slice()
     .sort(icCompararEnderecoPulmao);
 
@@ -1108,7 +1483,7 @@ function icResumoRuasSelecionadas(){
 
     if(marcados.length === itens.length) return "Todas as ruas";
 
-    return marcados.map(chk => chk.value).join(", ");
+    return marcados.map(chk => chk.dataset.rua).join(", ");
 
 }
 
@@ -1149,7 +1524,7 @@ function icImprimirPickings(){
     if(!dados.length){
 
         alert(
-            "Nenhum endereço de picking encontrado para a(s) rua(s) selecionada(s)."
+            "Nenhum endereço de picking encontrado para o(s) depósito(s) e rua(s) selecionado(s)."
         );
 
         return;
@@ -1165,13 +1540,15 @@ function icImprimirPickings(){
 
     dados.forEach(item=>{
 
-        if(item.rua !== ruaAtualImpressao){
+        const grupoImpressao = icChaveRua(item.deposito, item.rua);
 
-            ruaAtualImpressao = item.rua;
+        if(grupoImpressao !== ruaAtualImpressao){
+
+            ruaAtualImpressao = grupoImpressao;
 
             linhasHtml += `
             <tr class="grupo-rua">
-                <td colspan="${icMapaDunEan ? 6 : 4}">Rua ${item.rua}</td>
+                <td colspan="${icMapaDunEan ? 6 : 4}">${icNomeDeposito(item.deposito)} · Rua ${item.rua}</td>
             </tr>
             `;
 
@@ -1237,7 +1614,7 @@ function icImprimirPulmoes(){
     if(!dados.length){
 
         alert(
-            "Nenhum endereço de pulmão encontrado para a(s) rua(s) selecionada(s)."
+            "Nenhum endereço de pulmão encontrado para o(s) depósito(s) e rua(s) selecionado(s)."
         );
 
         return;
@@ -1253,13 +1630,15 @@ function icImprimirPulmoes(){
 
     dados.forEach(item=>{
 
-        if(item.rua !== ruaAtualImpressao){
+        const grupoImpressao = icChaveRua(item.deposito, item.rua);
 
-            ruaAtualImpressao = item.rua;
+        if(grupoImpressao !== ruaAtualImpressao){
+
+            ruaAtualImpressao = grupoImpressao;
 
             linhasHtml += `
             <tr class="grupo-rua">
-                <td colspan="${icMapaDunEan ? 7 : 5}">Rua ${item.rua}</td>
+                <td colspan="${icMapaDunEan ? 7 : 5}">${icNomeDeposito(item.deposito)} · Rua ${item.rua}</td>
             </tr>
             `;
 
@@ -1606,6 +1985,7 @@ td.qtd{
 
 <div class="info">
     <div><b>Data:</b> ${new Date().toLocaleString("pt-BR")}</div>
+    <div><b>Depósito(s):</b> ${icResumoDepositosSelecionados()}</div>
     <div><b>Rua(s):</b> ${icResumoRuasSelecionadas()}</div>
     <div><b>Total de endereços:</b> ${total}</div>
 </div>
