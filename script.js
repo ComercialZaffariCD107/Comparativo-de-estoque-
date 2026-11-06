@@ -1202,10 +1202,32 @@ function detectarColuna(objeto, candidatos){
 const CANDIDATOS_SEQENDERECO =
 ["seqendereco","seqendereço","seqend","seq_endereco","seq_end"];
 
+// cabeçalho comparável: sem acento, sem espaço/pontuação e
+// tolerante a arquivo UTF-8 lido como ISO-8859-1
+// ("SEQ ENDEREÇO", "Seq. Endereço", "SEQENDEREÃ‡O" -> "seqendere...")
+function normalizarCabecalho(nome){
+
+    return String(nome ?? "")
+    .replace(/^\uFEFF/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+}
+
 function detectarColunaSeqEndereco(linhas){
 
-    const coluna =
+    let coluna =
     detectarColuna(linhas?.[0], CANDIDATOS_SEQENDERECO);
+
+    if(!coluna && linhas?.[0]){
+
+        coluna =
+        Object.keys(linhas[0])
+        .find(k => normalizarCabecalho(k).startsWith("seqend")) || null;
+
+    }
 
     if(!coluna && linhas?.length){
 
