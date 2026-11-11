@@ -134,20 +134,36 @@ function icParseDataValidade(valor){
 
 }
 
+// Coluna DTVALIDADE da Posição de Endereços (também usada
+// pelo Comparativo de Estoque, em script.js)
+function icDetectarColunaValidade(linhas){
+
+    if(!linhas?.[0]) return null;
+
+    return (
+        detectarColuna(linhas[0], ["dtvalidade","dt_validade","datavalidade","data validade","dtvalid"]) ||
+        Object.keys(linhas[0]).find(k => normalizarCabecalho(k).includes("validade")) ||
+        null
+    );
+
+}
+
+// Validade de UMA data já lida: { data, dias, alerta } ou null
+function icStatusValidade(data, hoje){
+
+    if(!data) return null;
+
+    const dias = icDiasParaVencer(data, hoje);
+
+    return { data, dias, alerta: dias <= IC_DIAS_ALERTA_VALIDADE };
+
+}
+
 function icMontarMapaValidade(linhas){
 
     if(!linhas?.length) return null;
 
-    let col =
-    detectarColuna(linhas[0], ["dtvalidade","dt_validade","datavalidade","data validade","dtvalid"]);
-
-    if(!col){
-
-        col =
-        Object.keys(linhas[0])
-        .find(k => normalizarCabecalho(k).includes("validade")) || null;
-
-    }
+    const col = icDetectarColunaValidade(linhas);
 
     if(!col){
 
@@ -204,11 +220,7 @@ function icValidadeDoItem(item, hoje){
         chaveEndereco(item.rua, item.predio, item.apto, item.sala)
     );
 
-    if(!data) return null;
-
-    const dias = icDiasParaVencer(data, hoje);
-
-    return { data, dias, alerta: dias <= IC_DIAS_ALERTA_VALIDADE };
+    return icStatusValidade(data, hoje);
 
 }
 

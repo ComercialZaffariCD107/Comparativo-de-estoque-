@@ -390,17 +390,28 @@ function sincronizarTodosDeposito(){
 
 }
 
+// O rótulo muda na hora; a lista de ruas e os cards são
+// refeitos logo depois, num passo só (marcar vários depósitos
+// em sequência não trava a tela).
+let timerDeposito = null;
+
 function aoMudarDeposito(){
 
     atualizarLabelDeposito();
 
-    popularFiltroRua();
+    clearTimeout(timerDeposito);
 
-    if(typeof aplicarFiltros === "function"){
+    timerDeposito = setTimeout(()=>{
 
-        aplicarFiltros();
+        popularFiltroRua();
 
-    }
+        if(typeof aplicarFiltros === "function"){
+
+            aplicarFiltros();
+
+        }
+
+    }, 80);
 
 }
 
@@ -1476,6 +1487,22 @@ function gerarComparativo(){
     const lerSeqEndereco = p =>
     colSeqEndereco ? normalizarCodigo(p?.[colSeqEndereco]) : "";
 
+    // DTVALIDADE: mesma Posição de Endereços (null = sem coluna,
+    // e a impressão sai sem validade)
+    const colValidade =
+    icDetectarColunaValidade(dadosPosicoes);
+
+    if(!colValidade && dadosPosicoes.length){
+
+        console.warn(
+            "Coluna DTVALIDADE não encontrada na Posição de Endereços — o relatório de contagem sai sem validade."
+        );
+
+    }
+
+    const lerValidade = p =>
+    colValidade && p ? icParseDataValidade(p[colValidade]) : null;
+
     dadosPosicoes.forEach(p=>{
 
         const codigo =
@@ -1556,6 +1583,9 @@ function gerarComparativo(){
         const seqEnderecoApanha =
         posicaoApanha ? lerSeqEndereco(posicaoApanha) : "";
 
+        const validadeApanha =
+        lerValidade(posicaoApanha);
+
         const pulmoesBrutos =
         mapaPulmoes[sku] || [];
 
@@ -1578,7 +1608,10 @@ function gerarComparativo(){
             Number(p.EMBALAGEM || 0),
 
             seqEndereco:
-            lerSeqEndereco(p)
+            lerSeqEndereco(p),
+
+            validade:
+            lerValidade(p)
 
         }));
 
@@ -1638,6 +1671,8 @@ function gerarComparativo(){
             seqEnderecoApanha,
 
             quantidadeApanha,
+
+            validadeApanha,
 
             depositoApanha:
             lerDepositoPosicao(posicaoApanha),
@@ -1939,10 +1974,19 @@ function atualizarKPIs(){
 // RENDERIZAR CARDS
 // =====================================
 
+// Cards desenhados em lotes: o primeiro aparece na hora e o
+// resto entra quadro a quadro, sem congelar a tela. Um novo
+// filtro cancela o desenho anterior que ainda não terminou.
+const CARDS_PRIMEIRO_LOTE = 120;
+const CARDS_POR_LOTE = 250;
+let renderCardsToken = 0;
+
 function renderizarCards(dados = resultado){
 
     const container =
     document.getElementById("cardsContainer");
+
+    const token = ++renderCardsToken;
 
     if(!dados.length){
 
@@ -1955,9 +1999,9 @@ function renderizarCards(dados = resultado){
 
     }
 
-    let html = "";
+    const montarCard = item=>{
 
-    dados.forEach(item=>{
+        let html = "";
 
         // monta a lista de endereços do item: apanha
         // primeiro (sem qtd. de sistema fixa), depois
@@ -2125,9 +2169,41 @@ function renderizarCards(dados = resultado){
         </div>
         `;
 
-    });
+        return html;
 
-    container.innerHTML = html;
+    };
+
+    const montarLote = (inicio, fim)=>{
+
+        let html = "";
+
+        for(let i = inicio; i < fim && i < dados.length; i++){
+
+            html += montarCard(dados[i]);
+
+        }
+
+        return html;
+
+    };
+
+    container.innerHTML = montarLote(0, CARDS_PRIMEIRO_LOTE);
+
+    let pos = CARDS_PRIMEIRO_LOTE;
+
+    const proximoLote = ()=>{
+
+        if(token !== renderCardsToken || pos >= dados.length) return;
+
+        container.insertAdjacentHTML("beforeend", montarLote(pos, pos + CARDS_POR_LOTE));
+
+        pos += CARDS_POR_LOTE;
+
+        requestAnimationFrame(proximoLote);
+
+    };
+
+    requestAnimationFrame(proximoLote);
 
 }
 
@@ -2632,6 +2708,12 @@ function obterFiltrado(){
     .getElementById("filtroFormaAbast")
     ?.value || "todos";
 
+    // Sets: consulta O(1) dentro do laço (com includes() em
+    // array, cada item varria a lista inteira de ruas/SKUs)
+    const skusSet = new Set(skusFiltro);
+    const ruasSet = new Set(ruasFiltro);
+    const pavilhoesSet = new Set(pavilhoesFiltro);
+
     let filtrado = resultado.filter(item=>{
 
         // SKU: multi-seleção — array vazio = sem
@@ -2641,7 +2723,7 @@ function obterFiltrado(){
 
             !skusFiltro.length ||
 
-            skusFiltro.includes(item.sku);
+            skusSet.has(item.sku);
 
         // filtro EXATO — não é "a partir de"
 
@@ -2675,7 +2757,7 @@ function obterFiltrado(){
 
             item.pavilhao === null ||
 
-            pavilhoesFiltro.includes(item.pavilhao);
+            pavilhoesSet.has(item.pavilhao);
 
         // depósito: bate se a apanha OU qualquer pulmão
         // do item estiver num depósito marcado
@@ -2700,10 +2782,10 @@ function obterFiltrado(){
             !ruasFiltro.length ||
 
             (item.enderecoApanha &&
-             ruasFiltro.includes(chaveRuaFiltro(item.depositoApanha, item.enderecoApanha))) ||
+             ruasSet.has(chaveRuaFiltro(item.depositoApanha, item.enderecoApanha))) ||
 
             item.pulmoes.some(p=>
-                ruasFiltro.includes(chaveRuaFiltro(p.deposito, p.endereco))
+                ruasSet.has(chaveRuaFiltro(p.deposito, p.endereco))
             );
 
         // forma de abastecimento (só filtra se o arquivo foi carregado)
@@ -2764,11 +2846,20 @@ function obterFiltrado(){
 
 }
 
+// Agrupa cliques seguidos nos filtros num único recálculo
+let timerFiltros = null;
+
 function aplicarFiltros(){
 
-    renderizarCards(
-        obterFiltrado()
-    );
+    clearTimeout(timerFiltros);
+
+    timerFiltros = setTimeout(()=>{
+
+        renderizarCards(
+            obterFiltrado()
+        );
+
+    }, 60);
 
 }
 
@@ -2831,6 +2922,8 @@ function enderecoPrincipal(item){
 
 }
 
+const COLLATOR_ENDERECO = new Intl.Collator("pt-BR", {numeric:true});
+
 function imprimirContagem(){
 
     // ordem de impressão: por endereço (rua), A - Z —
@@ -2850,13 +2943,14 @@ function imprimirContagem(){
         if(!enderecoA) return 1;
         if(!enderecoB) return -1;
 
-        return enderecoA.localeCompare(
-            enderecoB,
-            "pt-BR",
-            {numeric:true}
-        );
+        return COLLATOR_ENDERECO.compare(enderecoA, enderecoB);
 
     });
+
+    // validade x data da impressão (alerta em até 20 dias)
+    const hojeImpressao = icHojeMeiaNoite();
+
+    let alertasValidade = 0;
 
     if(!dados.length){
 
@@ -3082,6 +3176,42 @@ h1{
 
 }
 
+.enderecos td.tag .val{
+    font-weight:normal;
+    font-size:9px;
+    color:#6b7280;
+    margin-top:1px;
+}
+
+.enderecos td.tag .val-alerta{
+    display:inline-block;
+    font-weight:bold;
+    color:#b4232f;
+    background:#fbe6e8;
+    border:1px solid #D9333F;
+    border-radius:8px;
+    padding:1px 6px;
+}
+
+.enderecos tr.linha-alerta td{
+    background:#fff6f6;
+}
+
+.item.item-alerta{
+    border-left:4px solid #D9333F;
+}
+
+.aviso-validade{
+    margin:-6px 0 14px;
+    padding:6px 10px;
+    border:1px solid #D9333F;
+    border-left-width:4px;
+    border-radius:4px;
+    background:#fbe6e8;
+    color:#b4232f;
+    font-size:11.5px;
+}
+
 .enderecos td.centro{
 
     text-align:center;
@@ -3246,7 +3376,10 @@ h1{
 
 @media print{
 
-    .item{
+    .item,
+    .val-alerta,
+    .aviso-validade,
+    tr.linha-alerta td{
 
         -webkit-print-color-adjust:exact;
 
@@ -3305,6 +3438,8 @@ h1{
 
 </div>
 
+__AVISO_VALIDADE__
+
 <p class="aviso-contagem">Preencha a "Qtd. Encontrada" durante a contagem física. Quando o endereço indicar "CX", conte e informe em caixas; quando indicar "UN", conte e informe em unidades.</p>
 
 `;
@@ -3324,6 +3459,7 @@ h1{
             linhasEndereco.push({
                 endereco: item.enderecoApanha,
                 seqEndereco: item.seqEnderecoApanha,
+                validade: icStatusValidade(item.validadeApanha, hojeImpressao),
                 tipo: "Apanha",
                 qtdSistema: Number(item.quantidadeApanha) || 0
             });
@@ -3335,11 +3471,17 @@ h1{
             linhasEndereco.push({
                 endereco: p.endereco,
                 seqEndereco: p.seqEndereco,
+                validade: icStatusValidade(p.validade, hojeImpressao),
                 tipo: "Pulmão",
                 qtdSistema: p.quantidade
             });
 
         });
+
+        const alertasItem =
+        linhasEndereco.filter(l => l.validade?.alerta).length;
+
+        alertasValidade += alertasItem;
 
         const embalagemItem = Number(item.embalagem) || 1;
 
@@ -3370,8 +3512,8 @@ h1{
             podeConverterCx ? sistemaUn / embalagemItem : sistemaUn;
 
             return `
-                <tr class="${l.tipo === "Apanha" ? "apanha" : ""}" data-linha-sku="${item.sku}">
-                    <td class="tag">${l.endereco}${htmlSeqEndereco(l.seqEndereco)}</td>
+                <tr class="${l.tipo === "Apanha" ? "apanha" : ""}${l.validade?.alerta ? " linha-alerta" : ""}" data-linha-sku="${item.sku}">
+                    <td class="tag">${l.endereco}${htmlSeqEndereco(l.seqEndereco)}${htmlValidade(l.validade)}</td>
                     <td>${l.tipo}</td>
                     <td class="encontrada">
                         <input
@@ -3417,7 +3559,7 @@ h1{
 
         html += `
 
-<div class="item">
+<div class="item${alertasItem ? " item-alerta" : ""}">
 
     <div class="item-topo">
 
@@ -3547,6 +3689,13 @@ document.addEventListener("input", function(e){
 </html>
 
 `;
+
+    html = html.replace(
+        "__AVISO_VALIDADE__",
+        alertasValidade
+        ? `<div class="aviso-validade"><b>⚠ ${alertasValidade} ${alertasValidade === 1 ? "endereço" : "endereços"} com validade em até ${IC_DIAS_ALERTA_VALIDADE} dias</b> (ou já vencido) a partir de ${new Date().toLocaleDateString("pt-BR")} — marcados em vermelho.</div>`
+        : ""
+    );
 
     janela.document.open();
 
