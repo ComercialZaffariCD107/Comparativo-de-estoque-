@@ -92,6 +92,154 @@ function icSeqEndereco(item){
 
 }
 
+// =====================================
+// VALIDADE (DTVALIDADE da Posição de Endereços)
+// Mapa "RUA.PREDIO.APTO.SALA" -> Date (a validade mais
+// próxima do endereço). null = sem validade na impressão.
+// Alerta na folha quando faltam IC_DIAS_ALERTA_VALIDADE
+// dias ou menos (ou já venceu) na data de impressão.
+// =====================================
+
+const IC_DIAS_ALERTA_VALIDADE = 20;
+
+let icMapaValidade = null;
+
+// "2028-02-02-00.00.00.000000", "2028-02-02", "02/02/2028"
+function icParseDataValidade(valor){
+
+    const t = String(valor ?? "").trim();
+
+    if(!t) return null;
+
+    let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    let ano, mes, dia;
+
+    if(m){ ano = +m[1]; mes = +m[2]; dia = +m[3]; }
+    else{
+
+        m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+
+        if(!m) return null;
+
+        dia = +m[1]; mes = +m[2]; ano = +m[3];
+
+        if(ano < 100) ano += 2000;
+
+    }
+
+    // datas "vazias" do WMS (1900-01-01, 9999-12-31...) não contam
+    if(ano < 2000 || ano > 2200 || mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+
+    return new Date(ano, mes - 1, dia);
+
+}
+
+function icMontarMapaValidade(linhas){
+
+    if(!linhas?.length) return null;
+
+    let col =
+    detectarColuna(linhas[0], ["dtvalidade","dt_validade","datavalidade","data validade","dtvalid"]);
+
+    if(!col){
+
+        col =
+        Object.keys(linhas[0])
+        .find(k => normalizarCabecalho(k).includes("validade")) || null;
+
+    }
+
+    if(!col){
+
+        console.warn(
+            "Coluna DTVALIDADE não encontrada na Posição de Endereços — a folha sai sem validade. Colunas:",
+            Object.keys(linhas[0])
+        );
+
+        return null;
+
+    }
+
+    const mapa = new Map();
+
+    linhas.forEach(p=>{
+
+        const data = icParseDataValidade(p[col]);
+
+        if(!data) return;
+
+        const chave =
+        chaveEndereco(p.CODRUA, p.NROPREDIO, p.NROAPARTAMENTO, p.NROSALA);
+
+        const atual = mapa.get(chave);
+
+        // mais de um lote no endereço: vale o que vence primeiro
+        if(!atual || data < atual) mapa.set(chave, data);
+
+    });
+
+    return mapa.size ? mapa : null;
+
+}
+
+// dias entre hoje (data da impressão) e a validade
+function icDiasParaVencer(data, hoje){
+
+    return Math.round((data - hoje) / 86400000);
+
+}
+
+function icFormatarData(data){
+
+    return data.toLocaleDateString("pt-BR", {day:"2-digit", month:"2-digit", year:"2-digit"});
+
+}
+
+// { data, dias, alerta } ou null
+function icValidadeDoItem(item, hoje){
+
+    if(!icMapaValidade) return null;
+
+    const data = icMapaValidade.get(
+        chaveEndereco(item.rua, item.predio, item.apto, item.sala)
+    );
+
+    if(!data) return null;
+
+    const dias = icDiasParaVencer(data, hoje);
+
+    return { data, dias, alerta: dias <= IC_DIAS_ALERTA_VALIDADE };
+
+}
+
+// linha discreta abaixo do endereço; vira etiqueta vermelha no alerta
+function htmlValidade(v){
+
+    if(!v) return "";
+
+    if(!v.alerta){
+
+        return `<div class="val">Val. ${icFormatarData(v.data)}</div>`;
+
+    }
+
+    const prazo =
+    v.dias < 0 ? `vencido há ${-v.dias} ${-v.dias === 1 ? "dia" : "dias"}`
+    : v.dias === 0 ? "vence hoje"
+    : `${v.dias} ${v.dias === 1 ? "dia" : "dias"}`;
+
+    return `<div class="val val-alerta">⚠ Val. ${icFormatarData(v.data)} · ${prazo}</div>`;
+
+}
+
+function icHojeMeiaNoite(){
+
+    const h = new Date();
+
+    return new Date(h.getFullYear(), h.getMonth(), h.getDate());
+
+}
+
 // chave comparável entre arquivos (sem espaços e sem zeros à esquerda)
 function icChaveSku(valor){
 
@@ -293,15 +441,23 @@ async function icProcessar(){
 
         if(arquivoPosicoesIc){
 
+            const brutoPosicoesIc = await lerTXT(arquivoPosicoesIc);
+
             icMapaSeqEndereco =
-            montarMapaSeqEndereco(await lerTXT(arquivoPosicoesIc));
+            montarMapaSeqEndereco(brutoPosicoesIc);
+
+            icMapaValidade =
+            icMontarMapaValidade(brutoPosicoesIc);
 
             if(nomePosicoesIc){
 
                 nomePosicoesIc.innerText =
-                icMapaSeqEndereco
+                (icMapaSeqEndereco
                 ? `${arquivoPosicoesIc.name} · ${icMapaSeqEndereco.size.toLocaleString("pt-BR")} endereços`
-                : `${arquivoPosicoesIc.name} · coluna SEQENDEREÇO não encontrada`;
+                : `${arquivoPosicoesIc.name} · coluna SEQENDEREÇO não encontrada`) +
+                (icMapaValidade
+                ? ` · validade em ${icMapaValidade.size.toLocaleString("pt-BR")}`
+                : " · sem DTVALIDADE");
 
             }
 
@@ -311,10 +467,14 @@ async function icProcessar(){
             icMapaSeqEndereco =
             montarMapaSeqEndereco(dadosPosicoes);
 
-            if(nomePosicoesIc && icMapaSeqEndereco){
+            icMapaValidade =
+            icMontarMapaValidade(dadosPosicoes);
+
+            if(nomePosicoesIc && (icMapaSeqEndereco || icMapaValidade)){
 
                 nomePosicoesIc.innerText =
-                `🔗 Reaproveitada do Comparativo · ${icMapaSeqEndereco.size.toLocaleString("pt-BR")} endereços`;
+                `🔗 Reaproveitada do Comparativo · ${(icMapaSeqEndereco?.size ?? 0).toLocaleString("pt-BR")} endereços` +
+                (icMapaValidade ? ` · validade em ${icMapaValidade.size.toLocaleString("pt-BR")}` : "");
 
             }
 
@@ -322,6 +482,7 @@ async function icProcessar(){
         else{
 
             icMapaSeqEndereco = null;
+            icMapaValidade = null;
 
         }
 
@@ -733,10 +894,67 @@ function icCelulaDescricao(sku, descricao){
 // já existente no script.js)
 // =====================================
 
+// Contagens por "DEPÓSITO|RUA", calculadas uma vez ao processar.
+// Os KPIs passam a somar só as ruas marcadas (centenas de itens)
+// em vez de refiltrar e reordenar dezenas de milhares de linhas
+// a cada clique no filtro — era isso que travava a tela.
+let icContagemPorRua = new Map();
+
+function icStatusOcupado(status){
+
+    const s = String(status ?? "").toLowerCase();
+
+    return s === "ocupado" || s === "reservado";
+
+}
+
+function icStatusDisponivel(status){
+
+    const s = String(status ?? "").toLowerCase();
+
+    return s === "disponivel" || s === "disponível";
+
+}
+
 function icMontarListaDeRuas(){
 
     const depositos = new Set();
     const ruas = new Map();
+
+    icContagemPorRua = new Map();
+
+    const contagem = chave=>{
+
+        let c = icContagemPorRua.get(chave);
+
+        if(!c){
+
+            c = {pickings:0, pulmoes:0, ocupados:0, disponiveis:0};
+
+            icContagemPorRua.set(chave, c);
+
+        }
+
+        return c;
+
+    };
+
+    icDadosRuasFixas.forEach(l=>{
+
+        contagem(icChaveRua(l.deposito, l.rua)).pickings++;
+
+    });
+
+    icDadosPulmao.forEach(l=>{
+
+        const c = contagem(icChaveRua(l.deposito, l.rua));
+
+        c.pulmoes++;
+
+        if(icStatusOcupado(l.status)) c.ocupados++;
+        else if(icStatusDisponivel(l.status)) c.disponiveis++;
+
+    });
 
     [...icDadosPulmao, ...icDadosRuasFixas].forEach(l=>{
 
@@ -758,7 +976,7 @@ function icMontarListaDeRuas(){
     });
 
     const ordem = (a,b)=>
-    String(a).localeCompare(String(b), "pt-BR", {numeric:true});
+    IC_COLLATOR.compare(String(a), String(b));
 
     // "Sem depósito" (código vazio) vai pro fim
     icDepositosDisponiveis =
@@ -913,11 +1131,23 @@ function icSincronizarTodosDeposito(){
 
 }
 
+// O rótulo atualiza na hora; a lista de ruas e os KPIs são
+// refeitos logo depois, num único passo, mesmo que vários
+// depósitos sejam marcados em sequência (o clique não trava).
+let icTimerDeposito = null;
+
 function icAoMudarDeposito(){
 
     icAtualizarLabelDeposito();
-    icPopularFiltroRua();
-    icAtualizarResumo();
+
+    clearTimeout(icTimerDeposito);
+
+    icTimerDeposito = setTimeout(()=>{
+
+        icPopularFiltroRua();
+        icAtualizarResumo();
+
+    }, 80);
 
 }
 
@@ -1286,6 +1516,8 @@ function icObterRuasFiltroAtual(){
 // → prédio → apto → sala. O lado é definido pelo número
 // do prédio (ex.: 115 = ímpar, 116 = par). Vale para
 // Picking e Pulmão (os dois usam este comparador).
+const IC_COLLATOR = new Intl.Collator("pt-BR", {numeric:true});
+
 function icNumeroOuNaN(valor){
 
     const n = parseInt(String(valor).trim(), 10);
@@ -1296,10 +1528,9 @@ function icNumeroOuNaN(valor){
 
 function icCompararDeposito(a, b){
 
-    return String(a.deposito ?? "").localeCompare(
-        String(b.deposito ?? ""),
-        "pt-BR",
-        {numeric:true}
+    return IC_COLLATOR.compare(
+        String(a.deposito ?? ""),
+        String(b.deposito ?? "")
     );
 
 }
@@ -1312,11 +1543,7 @@ function icCompararEndereco(a, b){
     if(cmpDep !== 0) return cmpDep;
 
     // 1) Rua
-    const cmpRua = String(a.rua).localeCompare(
-        String(b.rua),
-        "pt-BR",
-        {numeric:true}
-    );
+    const cmpRua = IC_COLLATOR.compare(String(a.rua), String(b.rua));
 
     if(cmpRua !== 0) return cmpRua;
 
@@ -1330,12 +1557,10 @@ function icCompararEndereco(a, b){
     if(ladoA !== ladoB) return ladoA - ladoB;
 
     // 3) Prédio → apto → sala (ordem natural crescente)
-    const opcoes = {numeric:true};
-
     return (
-        String(a.predio).localeCompare(String(b.predio), "pt-BR", opcoes) ||
-        String(a.apto).localeCompare(String(b.apto), "pt-BR", opcoes) ||
-        String(a.sala).localeCompare(String(b.sala), "pt-BR", opcoes)
+        IC_COLLATOR.compare(String(a.predio), String(b.predio)) ||
+        IC_COLLATOR.compare(String(a.apto), String(b.apto)) ||
+        IC_COLLATOR.compare(String(a.sala), String(b.sala))
     );
 
 }
@@ -1353,11 +1578,7 @@ function icCompararEnderecoPulmao(a, b){
     if(cmpDep !== 0) return cmpDep;
 
     // 1) Rua
-    const cmpRua = String(a.rua).localeCompare(
-        String(b.rua),
-        "pt-BR",
-        {numeric:true}
-    );
+    const cmpRua = IC_COLLATOR.compare(String(a.rua), String(b.rua));
 
     if(cmpRua !== 0) return cmpRua;
 
@@ -1381,12 +1602,10 @@ function icCompararEnderecoPulmao(a, b){
     if(alturaA !== alturaB) return alturaA < alturaB ? -1 : 1;
 
     // 4) Prédio → apto → sala (ordem natural crescente)
-    const opcoes = {numeric:true};
-
     return (
-        String(a.predio).localeCompare(String(b.predio), "pt-BR", opcoes) ||
-        String(a.apto).localeCompare(String(b.apto), "pt-BR", opcoes) ||
-        String(a.sala).localeCompare(String(b.sala), "pt-BR", opcoes)
+        IC_COLLATOR.compare(String(a.predio), String(b.predio)) ||
+        IC_COLLATOR.compare(String(a.apto), String(b.apto)) ||
+        IC_COLLATOR.compare(String(a.sala), String(b.sala))
     );
 
 }
@@ -1441,23 +1660,37 @@ function icFiltrarPulmoes(){
 
 function icAtualizarResumo(){
 
-    const pickings = icFiltrarPickings();
-    const pulmoes = icFiltrarPulmoes();
+    const depositos =
+    new Set(icObterDepositosFiltroAtual());
 
-    const ocupados =
-    pulmoes.filter(p=>
-        p.status.toLowerCase() === "ocupado" ||
-        p.status.toLowerCase() === "reservado"
-    ).length;
+    const itensRua =
+    Array.from(document.querySelectorAll(".icFiltroRuaItem"));
 
-    const disponiveis =
-    pulmoes.filter(p=>
-        p.status.toLowerCase() === "disponivel" ||
-        p.status.toLowerCase() === "disponível"
-    ).length;
+    const semFiltroRua =
+    !itensRua.length || itensRua.every(chk => chk.checked);
 
-    setTexto("icKpiPickings", pickings.length);
-    setTexto("icKpiPulmoesTotal", pulmoes.length);
+    const ruas =
+    new Set(itensRua.filter(chk => chk.checked).map(chk => chk.value));
+
+    let pickings = 0, pulmoes = 0, ocupados = 0, disponiveis = 0;
+
+    icContagemPorRua.forEach((c, chave)=>{
+
+        const deposito = chave.slice(0, chave.indexOf("|"));
+
+        if(!depositos.has(deposito)) return;
+
+        if(!semFiltroRua && !ruas.has(chave)) return;
+
+        pickings += c.pickings;
+        pulmoes += c.pulmoes;
+        ocupados += c.ocupados;
+        disponiveis += c.disponiveis;
+
+    });
+
+    setTexto("icKpiPickings", pickings);
+    setTexto("icKpiPulmoesTotal", pulmoes);
     setTexto("icKpiPulmoesOcupados", ocupados);
     setTexto("icKpiPulmoesDisponiveis", disponiveis);
 
@@ -1537,6 +1770,9 @@ function icImprimirPickings(){
 
     let linhasHtml = "";
     let ruaAtualImpressao = null;
+    let alertasValidade = 0;
+
+    const hoje = icHojeMeiaNoite();
 
     dados.forEach(item=>{
 
@@ -1554,9 +1790,13 @@ function icImprimirPickings(){
 
         }
 
+        const validade = icValidadeDoItem(item, hoje);
+
+        if(validade?.alerta) alertasValidade++;
+
         linhasHtml += `
-        <tr>
-            <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}${htmlSeqEndereco(icSeqEndereco(item))}</td>
+        <tr${validade?.alerta ? ` class="linha-alerta"` : ""}>
+            <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}${htmlSeqEndereco(icSeqEndereco(item))}${htmlValidade(validade)}</td>
             <td class="centro">${item.sku || "—"}</td>
             ${icMapaDunEan ? icCelulaCodigos(item.sku, "dun") + icCelulaCodigos(item.sku, "ean") : ""}
             ${icCelulaDescricao(item.sku, item.descricao)}
@@ -1573,6 +1813,8 @@ function icImprimirPickings(){
         subtitulo: "Comercial Zaffari · CD-107 · Nova Santa Rita/RS",
 
         total: dados.length,
+
+        alertasValidade,
 
         cabecalhoColunas: `
         <th>Endereço</th>
@@ -1627,6 +1869,9 @@ function icImprimirPulmoes(){
 
     let linhasHtml = "";
     let ruaAtualImpressao = null;
+    let alertasValidade = 0;
+
+    const hoje = icHojeMeiaNoite();
 
     dados.forEach(item=>{
 
@@ -1647,9 +1892,13 @@ function icImprimirPulmoes(){
         const statusClasse =
         `status-${item.status.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")}`;
 
+        const validade = icValidadeDoItem(item, hoje);
+
+        if(validade?.alerta) alertasValidade++;
+
         linhasHtml += `
-        <tr>
-            <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}${htmlSeqEndereco(icSeqEndereco(item))}</td>
+        <tr${validade?.alerta ? ` class="linha-alerta"` : ""}>
+            <td class="tag">${item.rua}.${item.predio}.${item.apto}.${item.sala}${htmlSeqEndereco(icSeqEndereco(item))}${htmlValidade(validade)}</td>
             <td class="centro"><span class="status-pill ${statusClasse}">${item.status || "—"}</span></td>
             <td class="centro">${item.sku || "—"}</td>
             ${icMapaDunEan ? icCelulaCodigos(item.sku, "dun") + icCelulaCodigos(item.sku, "ean") : ""}
@@ -1667,6 +1916,8 @@ function icImprimirPulmoes(){
         subtitulo: "Comercial Zaffari · CD-107 · Nova Santa Rita/RS",
 
         total: dados.length,
+
+        alertasValidade,
 
         cabecalhoColunas: `
         <th>Endereço</th>
@@ -1698,7 +1949,7 @@ function icImprimirPulmoes(){
 // escrever a contagem física)
 // =====================================
 
-function icMontarHtmlImpressao({titulo, subtitulo, total, cabecalhoColunas, linhasHtml}){
+function icMontarHtmlImpressao({titulo, subtitulo, total, alertasValidade = 0, cabecalhoColunas, linhasHtml}){
 
     return `
 <!DOCTYPE html>
@@ -1815,6 +2066,42 @@ table.itens td.tag .seq-end{
 
 table.itens td.centro{
     text-align:center;
+}
+
+table.itens td.tag .val{
+    font-weight:normal;
+    font-size:9px;
+    color:#6b7280;
+    margin-top:2px;
+}
+
+table.itens td.tag .val-alerta{
+    display:inline-block;
+    font-weight:bold;
+    color:#b4232f;
+    background:#fbe6e8;
+    border:1px solid #D9333F;
+    border-radius:8px;
+    padding:1px 6px;
+}
+
+table.itens tr.linha-alerta td{
+    background:#fff6f6;
+}
+
+table.itens tr.linha-alerta td:first-child{
+    box-shadow:inset 3px 0 0 #D9333F;
+}
+
+.aviso-validade{
+    margin-top:8px;
+    padding:6px 10px;
+    border:1px solid #D9333F;
+    border-left-width:4px;
+    border-radius:4px;
+    background:#fbe6e8;
+    color:#b4232f;
+    font-size:11.5px;
 }
 
 table.itens tr.grupo-rua td{
@@ -1957,7 +2244,10 @@ td.qtd{
     }
 
     .status-pill,
-    .abast{
+    .abast,
+    .val-alerta,
+    .aviso-validade,
+    tr.linha-alerta td{
         -webkit-print-color-adjust:exact;
         print-color-adjust:exact;
     }
@@ -1995,6 +2285,13 @@ ${icMapaFormaAbast ? `
     <b>Forma de abastecimento:</b>
     <span class="abast abast-interno">Interno CD · Inversa</span>
     <span class="abast abast-compra">Compra Entrega · Depósito</span>
+</div>
+` : ""}
+
+${alertasValidade ? `
+<div class="aviso-validade">
+    <b>⚠ ${alertasValidade} ${alertasValidade === 1 ? "endereço" : "endereços"} com validade em até ${IC_DIAS_ALERTA_VALIDADE} dias</b>
+    (ou já vencido) a partir de ${new Date().toLocaleDateString("pt-BR")} — marcados em vermelho na lista.
 </div>
 ` : ""}
 
